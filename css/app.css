@@ -96,6 +96,31 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
   body:has(.panel:not([hidden])) .layers { right: 456px; }
 }
 
+/* ---- weather bar ---- */
+.wx-bar {
+  position: fixed; top: calc(var(--safe-top) + 62px); left: 12px; right: 12px; max-width: 560px; z-index: 2;
+  background: var(--card); border-radius: 14px; box-shadow: var(--shadow); padding: 6px 10px 6px;
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+.wx-kinds { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+.wx-kinds::-webkit-scrollbar { display: none; }
+.wx-kinds label { flex: none; display: flex; align-items: center; gap: 4px; font-size: 13px; background: var(--chip); border-radius: 999px; padding: 3px 10px 3px 6px; }
+.wx-kinds input { accent-color: var(--accent); margin: 0; }
+.wx-time { display: flex; align-items: center; gap: 8px; }
+.wx-time input[type=range] { flex: 1; accent-color: var(--accent); }
+.wx-when { font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.wx-status { font-size: 11px; color: var(--muted); }
+body:has(.wx-bar:not([hidden])) .results { top: calc(var(--safe-top) + 160px); }
+
+/* ---- tide ---- */
+.tide svg { width: 100%; height: 90px; display: block; stroke-width: 1.5; }
+.tide .curve { stroke: #1d6fa5; fill: rgba(29, 111, 165, .12); }
+.tide .now { stroke: #d2462f; stroke-dasharray: 3 3; }
+.tide .day { stroke: var(--line); }
+.tide ul { list-style: none; padding: 0; margin: 6px 0 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 2px 12px; font-variant-numeric: tabular-nums; font-size: 14px; }
+.tide li { white-space: nowrap; }
+.tide li b { font-weight: 600; }
+
 /* ---- port panel: a sheet from the bottom on phones, a side card on wide screens ---- */
 .panel {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 4;

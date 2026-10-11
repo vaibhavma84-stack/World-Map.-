@@ -47,9 +47,31 @@
 
   <div id="layers" class="layers" hidden>
     <label><input type="checkbox" data-layer="seamarks"> Sea chart marks <small>TSS, routes, lights, buoys · online</small></label>
+    <label><input type="checkbox" data-layer="weather"> Weather and sea state <small>wind, isobars, waves, swell, current · online</small></label>
+    <label><input type="checkbox" data-layer="currents"> Major ocean currents <small>usual set and rate</small></label>
     <label><input type="checkbox" data-layer="pilots"> Pilot boarding places</label>
     <label><input type="checkbox" data-layer="rivers"> Rivers and lakes</label>
     <label><input type="checkbox" data-layer="grid"> Latitude and longitude</label>
+  </div>
+
+  <div id="wx-bar" class="wx-bar" hidden>
+    <div class="wx-kinds">
+      <label><input type="checkbox" data-kind="wind"> Wind</label>
+      <label><input type="checkbox" data-kind="pressure"> Isobars</label>
+      <label><input type="checkbox" data-kind="waves"> Waves</label>
+      <label><input type="checkbox" data-kind="swell"> Swell</label>
+      <label><input type="checkbox" data-kind="current"> Current</label>
+      <label><input type="checkbox" data-kind="temp"> Air °C</label>
+      <label><input type="checkbox" data-kind="sst"> Sea °C</label>
+    </div>
+    <div class="wx-time">
+      <input id="wx-slider" type="range" min="0" max="71" value="0" aria-label="Forecast time">
+      <span id="wx-time" class="wx-when"></span>
+      <button id="wx-reload" class="icon" type="button" aria-label="Download again">
+        <svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5"/></svg>
+      </button>
+    </div>
+    <div id="wx-status" class="wx-status"></div>
   </div>
 
   <div id="coords" class="coords" aria-live="off"></div>

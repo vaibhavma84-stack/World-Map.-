@@ -1,5 +1,7 @@
 import { COUNTRIES, countryName, currencyName, currencySymbol, flag } from './countries.js';
 import { PHRASES, LANGUAGES, TERMS, languageName } from './languages.js';
+import { setupWeather, tideAt, turningPoints, flowImage } from './weather.js';
+import { currentFeatures } from './currents.js';
 import {
   offsetMinutes, zonedToUtc, formatOffset, formatSpan, clock, longDate, shipClock,
   nextClockChange, sun, position,
@@ -293,9 +295,12 @@ map.on('click', (e) => {
   const pad = 12;
   const box = [[e.point.x - pad, e.point.y - pad], [e.point.x + pad, e.point.y + pad]];
   const pilotHit = map.queryRenderedFeatures(box, { layers: ['pilots'] })[0];
+  const currentHit = shown.currents && map.getLayer('currents-line') && map.queryRenderedFeatures(box, { layers: ['currents-line'] })[0];
   const hits = map.queryRenderedFeatures(box, { layers: PORT_LAYERS });
   if (pilotHit && (!hits.length || map.getZoom() >= 8)) {
     showPilot(pilots[pilotHit.properties.i]);
+  } else if (!hits.length && currentHit) {
+    showCurrent(currentHit.properties);
   } else if (hits.length) {
     const best = hits
       .map((f) => ports[f.properties.i])
@@ -319,17 +324,58 @@ for (const layer of [...PORT_LAYERS, 'pilots']) {
 // -------------------------------------------------------------------- layers
 const LAYER_GROUPS = {
   seamarks: ['seamarks'],
+  currents: ['currents-line', 'currents-arrows', 'currents-names'],
   pilots: ['pilots', 'pilot-p', 'pilot-names'],
   rivers: ['rivers-0', 'rivers-6', 'rivers-9', 'river-names-0', 'river-names-5', 'river-names-9', 'lakes', 'lake-names'],
   grid: ['grid'],
 };
-const shown = { seamarks: true, pilots: true, rivers: true, grid: true, ...store.get('layers', {}) };
+const shown = { seamarks: true, currents: true, pilots: true, rivers: true, grid: true, weather: false, ...store.get('layers', {}) };
+let wx = null;
 function applyLayers() {
   for (const [group, ids] of Object.entries(LAYER_GROUPS)) {
     for (const id of ids) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', shown[group] ? 'visible' : 'none');
   }
+  wx?.setOn(shown.weather);
 }
-map.on('load', applyLayers);
+
+// The great ocean currents: warm in red, cold in blue, arrows the way they set.
+function addCurrents() {
+  map.addImage('flow-warm', flowImage('#d1495b'), { pixelRatio: 2 });
+  map.addImage('flow-cold', flowImage('#2e86de'), { pixelRatio: 2 });
+  map.addSource('currents', { type: 'geojson', data: currentFeatures() });
+  const before = 'borders';
+  const tint = ['case', ['get', 'warm'], '#d1495b', '#2e86de'];
+  map.addLayer({
+    id: 'currents-line', type: 'line', source: 'currents',
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': tint, 'line-opacity': 0.45, 'line-width': zoomed([[1, 3], [5, 7]]), 'line-blur': 1 },
+  }, before);
+  map.addLayer({
+    id: 'currents-arrows', type: 'symbol', source: 'currents',
+    layout: {
+      'symbol-placement': 'line', 'symbol-spacing': 90, 'icon-image': ['case', ['get', 'warm'], 'flow-warm', 'flow-cold'],
+      'icon-size': zoomed([[1, 0.6], [5, 0.9]]), 'icon-allow-overlap': true, 'icon-ignore-placement': true,
+    },
+  }, before);
+  map.addLayer({
+    id: 'currents-names', type: 'symbol', source: 'currents', minzoom: 1.5,
+    layout: {
+      'symbol-placement': 'line', 'symbol-spacing': 600, 'text-field': ['get', 'label'],
+      'text-font': ['OpenSans-Italic'], 'text-size': zoomed([[1.5, 10], [5, 12.5]]), 'text-max-angle': 40,
+      'text-offset': [0, -1.1],
+    },
+    paint: { 'text-color': ['case', ['get', 'warm'], '#a3243b', '#1f5f9e'], ...halo },
+  }, before);
+}
+
+map.on('load', () => {
+  addCurrents();
+  wx = setupWeather(map, {
+    bar: $('#wx-bar'), slider: $('#wx-slider'), time: $('#wx-time'), status: $('#wx-status'),
+    reload: $('#wx-reload'), kinds: [...document.querySelectorAll('#wx-bar [data-kind]')],
+  });
+  applyLayers();
+});
 const layersBox = $('#layers');
 for (const box of layersBox.querySelectorAll('[data-layer]')) {
   box.checked = shown[box.dataset.layer];
@@ -575,6 +621,7 @@ function showPort(p) {
         <dl id="eta-out"></dl>
       </div>
       ${pilotCard(p)}
+      <div class="card tide" id="c-tide"><h3>Tide</h3><div class="note">Loading…</div></div>
       <div id="c-facts"></div>
     </div>
     <p class="source">${p.detail >= 0 ? 'NGA World Port Index' : 'UN/LOCODE'} · ${esc(p.tz)} · Not for navigation.</p>`);
@@ -588,6 +635,7 @@ function showPort(p) {
   ticker = setInterval(tick, 1000);
   renderEta(p);
   wireConverter();
+  loadTide(p);
   if (p.detail >= 0) {
     loadDetails().then((all) => { if (current === p) $('#c-facts').innerHTML = facts(all[p.detail]); });
   }
@@ -628,6 +676,19 @@ function pilotCard(p) {
       <span class="note">${nm.toFixed(1)} nm ${String(Math.round(brg) % 360).padStart(3, '0')}° from the port${b.name ? ` · ${esc(b.name)}` : ''}${b.channel ? ` · VHF ${esc(b.channel)}` : ''}</span>
     </button></li>`).join('')}</ul>
     <div class="note">OpenSeaMap; check ALRS Vol. 6 before relying on it.</div></div>`;
+}
+
+function showCurrent(c) {
+  clearInterval(ticker);
+  current = null;
+  map.getSource('picked').setData({ type: 'FeatureCollection', features: [] });
+  openPanel(`
+    <h1>${esc(c.name)}</h1>
+    <p class="sub">${c.warm ? 'Warm' : 'Cold'} current</p>
+    <div class="cards">
+      <div class="card"><h3>Usual rate</h3><div class="big">${esc(c.rate)}</div>${c.note ? `<div class="note">${esc(c.note)}</div>` : ''}</div>
+      <div class="card"><div class="note">The line is the current's usual axis. It shifts with season and weather; turn on Weather → Current for the set and drift forecast for today.</div></div>
+    </div>`);
 }
 
 function showPilot(b) {
@@ -694,6 +755,35 @@ function tick() {
       ? `<h3>Sun</h3><div class="big">${s.polar === 'day' ? 'Midnight sun' : 'Polar night'}</div>`
       : `<h3>Sunrise · Sunset (local)</h3><div class="big">${clock(p.tz, s.rise)} · ${clock(p.tz, s.set)}</div>`;
   }
+}
+
+async function loadTide(p) {
+  let t;
+  try {
+    t = await tideAt(p.lat, p.lon);
+  } catch {
+    if (current === p) $('#c-tide').innerHTML = '<h3>Tide</h3><div class="note">Needs a connection the first time; then kept for this port.</div>';
+    return;
+  }
+  if (current !== p) return;
+  const now = Date.now();
+  const from = now - 6 * 3600000, to = now + 42 * 3600000;
+  const idx = t.times.map((x, i) => i).filter((i) => t.times[i] >= from && t.times[i] <= to && t.h[i] != null);
+  if (idx.length < 6) { $('#c-tide').innerHTML = '<h3>Tide</h3><div class="note">No tide model for this spot.</div>'; return; }
+  const hs = idx.map((i) => t.h[i]);
+  const lo = Math.min(...hs), hi = Math.max(...hs);
+  const W = 320, H = 90, x = (tt) => ((tt - from) / (to - from)) * W, y = (v) => H - 6 - ((v - lo) / (hi - lo || 1)) * (H - 12);
+  const path = idx.map((i, n) => `${n ? 'L' : 'M'}${x(t.times[i]).toFixed(1)},${y(t.h[i]).toFixed(1)}`).join('');
+  const area = `${path}L${x(t.times[idx.at(-1)]).toFixed(1)},${H}L${x(t.times[idx[0]]).toFixed(1)},${H}Z`;
+  const turns = turningPoints(t).filter((q) => q.t >= now - 3600000).slice(0, 6);
+  const local = (tt) => new Intl.DateTimeFormat('en-GB', { timeZone: p.tz, weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(tt);
+  $('#c-tide').innerHTML = `<h3>Tide (model)</h3>
+    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
+      <path class="curve" d="${area}"/>
+      <line class="now" x1="${x(now)}" x2="${x(now)}" y1="0" y2="${H}"/>
+    </svg>
+    <ul>${turns.map((q) => `<li><b>${q.high ? 'HW' : 'LW'}</b> ${local(q.t)}  ${q.v >= 0 ? '+' : '−'}${Math.abs(q.v).toFixed(1)} m</li>`).join('')}</ul>
+    <div class="note">Open-Meteo sea level (tide and surge) relative to mean sea level, local time${t.stale ? ', saved earlier' : ''}. Not the official tide tables: check the port's tables before relying on depths.</div>`;
 }
 
 function renderEta(p) {
