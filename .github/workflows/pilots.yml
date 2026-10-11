@@ -5,7 +5,7 @@ name: Pilot boarding places
 # needs to, as the file then travels inside the app.
 on:
   schedule:
-    - cron: '17 3 1 * *'   # monthly
+    - cron: '17 3 * * 1'   # weekly, to fill areas a busy server skipped
   push:
     paths:
       - 'tools/fetch-pilots.mjs'
