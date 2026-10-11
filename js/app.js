@@ -101,6 +101,14 @@ const style = {
     grid: { type: 'geojson', data: graticule() },
     ports: { type: 'geojson', data: portFeatures, maxzoom: 12, buffer: 64 },
     pilots: { type: 'geojson', data: pilotFeatures },
+    // OpenSeaMap's chart symbols: traffic separation schemes, recommended
+    // tracks and routes, lights, buoys and beacons. Drawn by OpenSeaMap and
+    // fetched when there is a connection; tiles seen once are kept on the phone.
+    seamarks: {
+      type: 'raster', tileSize: 256, minzoom: 4, maxzoom: 18,
+      tiles: ['https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png'],
+      attribution: 'Seamarks © <a href="https://openseamap.org">OpenSeaMap</a> contributors',
+    },
     picked: { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
     me: { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
   },
@@ -190,6 +198,7 @@ const style = {
       },
       paint: { 'text-color': '#12324a', ...halo },
     })),
+    { id: 'seamarks', type: 'raster', source: 'seamarks', minzoom: 5, layout: { visibility: 'none' } },
     // Pilot boarding places: magenta, as on the chart.
     {
       id: 'pilots', type: 'circle', source: 'pilots', minzoom: 4,
@@ -231,7 +240,9 @@ const map = new maplibregl.Map({
   center: store.get('center', [70, 15]),
   zoom: store.get('zoom', 1.6),
   minZoom: 0.5,
-  maxZoom: 12,
+  // Past zoom 12 the coastline is Natural Earth's and only approximate, but
+  // the chart marks need the room to show every buoy.
+  maxZoom: 17,
   attributionControl: false,
   dragRotate: false,
   pitchWithRotate: false,
@@ -281,6 +292,31 @@ for (const layer of [...PORT_LAYERS, 'pilots']) {
   map.on('mouseenter', layer, () => { map.getCanvas().style.cursor = 'pointer'; });
   map.on('mouseleave', layer, () => { map.getCanvas().style.cursor = ''; });
 }
+
+// -------------------------------------------------------------------- layers
+const LAYER_GROUPS = {
+  seamarks: ['seamarks'],
+  pilots: ['pilots', 'pilot-p', 'pilot-names'],
+  rivers: ['rivers-0', 'rivers-6', 'rivers-9', 'river-names-0', 'river-names-5', 'river-names-9', 'lakes', 'lake-names'],
+  grid: ['grid'],
+};
+const shown = { seamarks: true, pilots: true, rivers: true, grid: true, ...store.get('layers', {}) };
+function applyLayers() {
+  for (const [group, ids] of Object.entries(LAYER_GROUPS)) {
+    for (const id of ids) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', shown[group] ? 'visible' : 'none');
+  }
+}
+map.on('load', applyLayers);
+const layersBox = $('#layers');
+for (const box of layersBox.querySelectorAll('[data-layer]')) {
+  box.checked = shown[box.dataset.layer];
+  box.onchange = () => { shown[box.dataset.layer] = box.checked; store.set('layers', shown); applyLayers(); };
+}
+$('#layers-btn').onclick = () => {
+  layersBox.hidden = !layersBox.hidden;
+  $('#layers-btn').setAttribute('aria-expanded', String(!layersBox.hidden));
+};
+map.on('click', () => { layersBox.hidden = true; });
 
 $('#world').onclick = () => map.flyTo({ center: [70, 15], zoom: 1.6 });
 

@@ -34,12 +34,22 @@
   <ul id="results" class="results" role="listbox" hidden></ul>
 
   <div class="tools">
+    <button id="layers-btn" class="icon round" type="button" aria-label="Map layers" aria-expanded="false">
+      <svg viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5 9-5z"/><path d="m3 13 9 5 9-5"/></svg>
+    </button>
     <button id="locate" class="icon round" type="button" aria-label="Show my position">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
     </button>
     <button id="world" class="icon round" type="button" aria-label="Whole world">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/></svg>
     </button>
+  </div>
+
+  <div id="layers" class="layers" hidden>
+    <label><input type="checkbox" data-layer="seamarks"> Sea chart marks <small>TSS, routes, lights, buoys · online</small></label>
+    <label><input type="checkbox" data-layer="pilots"> Pilot boarding places</label>
+    <label><input type="checkbox" data-layer="rivers"> Rivers and lakes</label>
+    <label><input type="checkbox" data-layer="grid"> Latitude and longitude</label>
   </div>
 
   <div id="coords" class="coords" aria-live="off"></div>

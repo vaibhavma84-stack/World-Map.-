@@ -83,6 +83,19 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 .coords:empty { display: none; }
 .maplibregl-ctrl-bottom-right { bottom: var(--safe-bottom); }
 
+/* ---- layer menu ---- */
+.layers {
+  position: fixed; right: 64px; bottom: calc(var(--safe-bottom) + 28px); z-index: 3;
+  background: var(--card-solid); border-radius: 14px; box-shadow: var(--shadow);
+  padding: 8px 12px; display: grid; gap: 2px; max-width: calc(100vw - 88px);
+}
+.layers label { display: grid; grid-template-columns: auto 1fr; column-gap: 10px; align-items: center; padding: 6px 0; }
+.layers input { width: 18px; height: 18px; accent-color: var(--accent); grid-row: span 2; }
+.layers small { grid-column: 2; color: var(--muted); font-size: 12px; }
+@media (min-width: 760px) {
+  body:has(.panel:not([hidden])) .layers { right: 456px; }
+}
+
 /* ---- port panel: a sheet from the bottom on phones, a side card on wide screens ---- */
 .panel {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 4;
@@ -102,8 +115,7 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
   }
   .panel.tall { max-height: none; }
   .grip { display: none; }
-  .tools { right: 404px; }
-  .panel[hidden] ~ .tools { right: 12px; }
+  body:has(.panel:not([hidden])) .tools { right: 404px; }
 }
 
 .panel h1 { font-size: 22px; line-height: 1.2; margin: 4px 40px 2px 0; }
