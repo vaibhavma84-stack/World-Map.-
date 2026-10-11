@@ -1,4 +1,5 @@
 import { COUNTRIES, countryName, currencyName, currencySymbol, flag } from './countries.js';
+import { PHRASES, LANGUAGES, TERMS, languageName } from './languages.js';
 import {
   offsetMinutes, zonedToUtc, formatOffset, formatSpan, clock, longDate, shipClock,
   nextClockChange, sun, position,
@@ -49,6 +50,24 @@ const pilotFeatures = {
   })),
 };
 
+// Exchange rates against the US dollar: the copy saved into the app by a
+// daily job on GitHub, replaced by a fresh one whenever there is a connection.
+let rates = await fetch('data/rates.json').then((r) => r.json()).catch(() => ({ date: null, rates: {} }));
+const savedRates = store.get('rates', null);
+if (savedRates?.date && (!rates.date || savedRates.date > rates.date)) rates = savedRates;
+(async () => {
+  try {
+    const ctl = new AbortController();
+    setTimeout(() => ctl.abort(), 6000);
+    const r = await fetch('https://open.er-api.com/v6/latest/USD', { signal: ctl.signal });
+    const j = await r.json();
+    if (j.result === 'success') {
+      const fresh = { date: new Date(j.time_last_update_unix * 1000).toISOString(), rates: j.rates, live: true };
+      if (!rates.date || fresh.date >= rates.date) { rates = fresh; store.set('rates', fresh); }
+    }
+  } catch { /* at sea: keep the saved rates */ }
+})();
+
 let details = null;
 const loadDetails = () => (details ??= load('details'));
 
@@ -92,12 +111,12 @@ const style = {
   version: 8,
   glyphs: `${here}fonts/{fontstack}/{range}.pbf`,
   sources: {
-    countries: { type: 'geojson', data: countries, tolerance: 0.2, maxzoom: 12 },
-    borders: { type: 'geojson', data: borders, tolerance: 0.2, maxzoom: 12 },
+    countries: { type: 'geojson', data: countries, tolerance: 0.05, maxzoom: 14 },
+    borders: { type: 'geojson', data: borders, tolerance: 0.05, maxzoom: 14 },
     labels: { type: 'geojson', data: labels },
-    rivers: { type: 'geojson', data: rivers, tolerance: 0.2, maxzoom: 12 },
+    rivers: { type: 'geojson', data: rivers, tolerance: 0.05, maxzoom: 14 },
     riverNames: { type: 'geojson', data: riverNames, maxzoom: 10 },
-    lakes: { type: 'geojson', data: lakes, tolerance: 0.2, maxzoom: 12 },
+    lakes: { type: 'geojson', data: lakes, tolerance: 0.05, maxzoom: 14 },
     grid: { type: 'geojson', data: graticule() },
     ports: { type: 'geojson', data: portFeatures, maxzoom: 12, buffer: 64 },
     pilots: { type: 'geojson', data: pilotFeatures },
@@ -249,6 +268,10 @@ const map = new maplibregl.Map({
   touchPitch: false,
   renderWorldCopies: true,
   fadeDuration: 150,
+  // Draw at least at twice the screen's pixels: crisp lines and text even on
+  // screens that report a low pixel ratio.
+  pixelRatio: Math.max(2, window.devicePixelRatio || 1),
+  antialias: true,
 });
 map.touchZoomRotate.disableRotation();
 map.addControl(new maplibregl.AttributionControl({
@@ -280,7 +303,7 @@ map.on('click', (e) => {
     showPort(best);
   } else {
     const land = map.queryRenderedFeatures(e.point, { layers: ['land'] })[0];
-    if (land) showCountry(land.properties, e.lngLat);
+    if (land) showCountry(land.properties);
     else closePanel();
   }
 });
@@ -434,29 +457,96 @@ function openPanel(html) {
   panel.scrollTop = 0;
 }
 
-function showCountry(props, lngLat) {
+function showCountry(props) {
+  const cc = props.iso && props.iso !== '-99' ? props.iso : null;
+  if (!cc) {
+    openPanel(`<h1>${esc(props.name)}</h1>`);
+    return;
+  }
+  openCountry(cc, props.name);
+}
+
+function openCountry(cc, name = countryName(cc)) {
   clearInterval(ticker);
   current = null;
   map.getSource('picked').setData({ type: 'FeatureCollection', features: [] });
-  const cc = props.iso && props.iso !== '-99' ? props.iso : null;
-  const count = cc ? ports.filter((p) => p.cc === cc).length : 0;
-  const money = cc && COUNTRIES[cc];
+  const own = ports.filter((p) => p.cc === cc);
+  // The country's clocks: the zones its ports keep, most ports first.
+  const zoneCount = new Map();
+  for (const p of own) if (!p.tz.startsWith('Etc/')) zoneCount.set(p.tz, (zoneCount.get(p.tz) || 0) + 1);
+  // Zones with a real share of the ports, by local offset: one line per clock.
+  const byOffset = new Map();
+  for (const [z, n] of [...zoneCount.entries()].sort((a, b) => b[1] - a[1])) {
+    const off = offsetMinutes(z);
+    if (n >= Math.max(2, own.length * 0.03) && !byOffset.has(off)) byOffset.set(off, z);
+  }
+  const zones = [...byOffset.values()].slice(0, 4);
+  const money = COUNTRIES[cc];
+  const langs = LANGUAGES[cc] || [];
+
   openPanel(`
-    <h1>${cc ? flag(cc) : ''} ${esc(props.name)}</h1>
-    <p class="sub">${position(lngLat.lat, ((lngLat.lng + 540) % 360) - 180)}</p>
+    <h1>${flag(cc)} ${esc(name)}</h1>
+    <p class="sub">${own.length.toLocaleString('en')} ports · zoom in to see them all</p>
     <div class="cards">
+      ${zones.length ? `<div class="card" id="c-local"></div>` : ''}
       ${money ? moneyCards(money) : ''}
-      <div class="card"><h3>Ports</h3><div class="big">${count.toLocaleString('en')}</div>
-        <div class="note">Zoom in to see them all; tap one for its local time and particulars.</div></div>
-    </div>`);
+      ${langs.length ? `<div class="card"><h3>Language${langs.length > 1 ? 's' : ''}</h3>
+        <div class="big">${langs.map((l) => esc(languageName(l))).join(' · ')}</div></div>` : ''}
+      ${langs.filter((l) => PHRASES[l]).map((l, n) => `
+        <details class="card phrases" ${n === 0 ? 'open' : ''}>
+          <summary><h3>Useful words · ${esc(languageName(l))}</h3></summary>
+          <table class="words">${PHRASES[l].map(([word, say], i) => `
+            <tr><th>${TERMS[i]}</th><td><span class="word" lang="${l}">${esc(word)}</span><span class="say">${esc(say)}</span></td></tr>`).join('')}
+          </table>
+        </details>`).join('')}
+      ${langs.length && !langs.some((l) => PHRASES[l]) && !langs.includes('en') ? '<div class="note">No phrases for this language yet.</div>' : ''}
+    </div>
+    <p class="source">Rates: <a href="https://www.exchangerate-api.com" target="_blank" rel="noopener">ExchangeRate-API</a>. Pronunciations are approximate.</p>`);
+
+  if (zones.length) {
+    const draw = () => {
+      const el = $('#c-local');
+      if (!el) return clearInterval(ticker);
+      const now = new Date();
+      el.innerHTML = `<h3>Local time</h3>${zones.map((z) => `
+        <div class="big">${clock(z, now, true)} <span class="note">${formatOffset(offsetMinutes(z, now))}${zones.length > 1 ? ` · ${esc(z.split('/').pop().replace(/_/g, ' '))}` : ''}</span></div>`).join('')}`;
+    };
+    draw();
+    ticker = setInterval(draw, 15000);
+  }
+  wireConverter();
 }
 
 function moneyCards([code, dial]) {
   const sym = currencySymbol(code);
+  const rate = rates.rates?.[code];
+  const fmt = (v) => v.toLocaleString('en', { maximumFractionDigits: v < 10 ? 4 : 2 });
+  const when = rates.date ? new Date(rates.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
   return `<div class="two">
     <div class="card"><h3>Currency</h3><div class="big">${esc(code)}${sym ? ` · ${esc(sym)}` : ''}</div><div class="note">${esc(currencyName(code))}</div></div>
     <div class="card"><h3>Dialling code</h3><div class="big">+${esc(dial)}</div><div class="note">From abroad</div></div>
-  </div>`;
+  </div>
+  ${code === 'USD' ? '' : `<div class="card money" data-rate="${rate || ''}" data-code="${esc(code)}">
+    <h3>Exchange rate</h3>
+    ${rate ? `<div class="big">1 USD = ${fmt(rate)} ${esc(code)}</div>
+      <div class="note">1 ${esc(code)} = ${fmt(1 / rate)} USD · ${rates.live ? 'live, ' : ''}${esc(when)}</div>
+      <div class="convert">
+        <label><input type="number" inputmode="decimal" min="0" step="any" data-from="usd" value="100"> USD</label>
+        <span>=</span>
+        <label><input type="number" inputmode="decimal" min="0" step="any" data-from="local" value="${(100 * rate).toFixed(2)}"> ${esc(code)}</label>
+      </div>`
+    : '<div class="note">No rate saved yet. Open the app once with a connection.</div>'}
+  </div>`}`;
+}
+
+function wireConverter() {
+  const box = body.querySelector('.money[data-rate]');
+  const rate = +box?.dataset.rate;
+  if (!rate) return;
+  const usd = box.querySelector('[data-from="usd"]');
+  const local = box.querySelector('[data-from="local"]');
+  usd.oninput = () => { local.value = usd.value === '' ? '' : (+usd.value * rate).toFixed(2); };
+  local.oninput = () => { usd.value = local.value === '' ? '' : (+local.value / rate).toFixed(2); };
 }
 
 function showPort(p) {
@@ -466,7 +556,7 @@ function showPort(p) {
   const chips = [RANK_NAMES[p.rank], p.locode].filter(Boolean);
   openPanel(`
     <h1>${esc(p.name)}</h1>
-    <p class="sub">${flag(p.cc)} ${esc(countryName(p.cc))} · ${position(p.lat, p.lon)}</p>
+    <p class="sub"><button type="button" class="linkish inline" data-country="${esc(p.cc)}">${flag(p.cc)} ${esc(countryName(p.cc))} ›</button> · ${position(p.lat, p.lon)}</p>
     <div class="chips">${chips.map((c) => `<span class="chip">${esc(c)}</span>`).join('')}</div>
     <div class="now"><span class="time" id="t-now"></span><span class="zone" id="t-zone"></span></div>
     <div class="date" id="t-date"></div>
@@ -497,6 +587,7 @@ function showPort(p) {
   clearInterval(ticker);
   ticker = setInterval(tick, 1000);
   renderEta(p);
+  wireConverter();
   if (p.detail >= 0) {
     loadDetails().then((all) => { if (current === p) $('#c-facts').innerHTML = facts(all[p.detail]); });
   }
@@ -668,6 +759,8 @@ body.addEventListener('click', (e) => {
     showPilot(b);
     map.flyTo({ center: [b.lon, b.lat], zoom: Math.max(map.getZoom(), 10), padding: clearOfPanel() });
   }
+  const cb = e.target.closest('[data-country]');
+  if (cb) openCountry(cb.dataset.country);
   const pp = e.target.closest('[data-port]');
   if (pp) choose(ports[+pp.dataset.port]);
 });

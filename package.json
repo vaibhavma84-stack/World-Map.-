@@ -8,7 +8,8 @@
     "start": "python3 -m http.server 8080",
     "test": "node tests/data.test.mjs",
     "pilots": "node tools/fetch-pilots.mjs",
-    "icons": "node tools/make-icons.mjs"
+    "icons": "node tools/make-icons.mjs",
+    "rates": "node tools/fetch-rates.mjs"
   },
   "repository": {
     "type": "git",

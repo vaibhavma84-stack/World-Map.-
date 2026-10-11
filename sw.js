@@ -6,10 +6,10 @@ const FONTS = ['OpenSans-Regular', 'OpenSans-Semibold', 'OpenSans-Italic', 'Open
 const RANGES = ['0-255', '256-511', '512-767', '8192-8447'];
 const FILES = [
   './', 'index.html', 'manifest.webmanifest', 'css/app.css',
-  'js/app.js', 'js/countries.js', 'js/time.js',
+  'js/app.js', 'js/countries.js', 'js/languages.js', 'js/time.js',
   'vendor/maplibre-gl.js', 'vendor/maplibre-gl.css',
   'data/countries.json', 'data/borders.json', 'data/labels.json', 'data/rivers.json', 'data/river-names.json',
-  'data/lakes.json', 'data/ports.json', 'data/details.json', 'data/pilots.json',
+  'data/lakes.json', 'data/ports.json', 'data/details.json', 'data/pilots.json', 'data/rates.json',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png',
   ...FONTS.flatMap((f) => RANGES.map((r) => `fonts/${f}/${r}.pbf`)),
 ];

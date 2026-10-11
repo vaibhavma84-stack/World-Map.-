@@ -10,7 +10,7 @@ on:
   # A commit made by the pilots job does not start other workflows by itself,
   # so listen for that job finishing.
   workflow_run:
-    workflows: ["Pilot boarding places"]
+    workflows: ["Pilot boarding places", "Exchange rates"]
     types: [completed]
   workflow_dispatch:
 

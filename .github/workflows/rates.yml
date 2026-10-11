@@ -1,0 +1,38 @@
+name: Exchange rates
+
+# Saves the day's rates against the US dollar into data/rates.json, so the app
+# has recent rates at sea. The app also fetches fresh ones when it is online.
+on:
+  schedule:
+    - cron: '41 6 * * *'   # daily
+  push:
+    paths:
+      - 'tools/fetch-rates.mjs'
+      - '.github/workflows/rates.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: rates
+  cancel-in-progress: false
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node tools/fetch-rates.mjs
+      - name: Save if changed
+        run: |
+          git add data/rates.json
+          git diff --cached --quiet && exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Update exchange rates"
+          git pull --rebase
+          git push

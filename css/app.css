@@ -150,6 +150,22 @@ table.facts { width: 100%; border-collapse: collapse; font-size: 14px; }
 .pilots .pos { font-variant-numeric: tabular-nums; font-weight: 600; color: #b0187a; }
 @media (prefers-color-scheme: dark) { .pilots .pos { color: #f07cc4; } }
 .linkish { border: 0; text-align: left; font-weight: 600; color: var(--accent); }
+.linkish.inline { background: none; padding: 0; font: inherit; color: var(--accent); font-weight: 500; }
+.money .convert { display: flex; align-items: center; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.money .convert label { display: flex; align-items: center; gap: 6px; color: var(--muted); }
+.money input { font: inherit; color: var(--ink); width: 7.5em; background: var(--card-solid); border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; }
+.phrases summary { list-style: none; cursor: pointer; }
+.phrases summary::-webkit-details-marker { display: none; }
+.phrases summary h3 { display: inline; }
+.phrases summary::after { content: "▾"; float: right; color: var(--muted); }
+.phrases:not([open]) summary::after { content: "▸"; }
+table.words { width: 100%; border-collapse: collapse; margin-top: 6px; }
+.words th { text-align: left; font-weight: normal; color: var(--muted); padding: 5px 8px 5px 0; vertical-align: top; white-space: nowrap; font-size: 13px; }
+.words td { padding: 5px 0; border-bottom: 1px solid var(--line); }
+.words tr:last-child td { border-bottom: 0; }
+.words .word { display: block; font-size: 17px; font-weight: 600; }
+.words .say { display: block; color: var(--muted); font-size: 13px; font-style: italic; }
+.source a { color: inherit; }
 .source { color: var(--muted); font-size: 12px; margin: 12px 0 0; }
 
 /* ---- settings ---- */

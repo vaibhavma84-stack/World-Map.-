@@ -59,13 +59,13 @@ const write = (name, value) => {
 };
 
 // ---------------------------------------------------------------- countries
-// Simplified as one topology, so neighbouring countries still share exactly
-// the same border line afterwards — which is also how "touching" is found.
+// Kept at Natural Earth's full 1:10m detail, as one topology, so neighbouring
+// countries share exactly the same border line — which is also how
+// "touching" is found.
 mapshaper('-i', cache + 'countries.geojson',
   '-filter-fields', 'NAME,ISO_A2_EH',
   '-rename-fields', 'name=NAME,iso=ISO_A2_EH',
-  '-simplify', '45%', 'keep-shapes',
-  '-o', 'format=topojson', 'quantization=200000', cache + 'countries.topo.json');
+  '-o', 'format=topojson', 'quantization=1000000', cache + 'countries.topo.json');
 
 const topo = JSON.parse(readFileSync(cache + 'countries.topo.json'));
 const layer = Object.keys(topo.objects)[0];
@@ -102,7 +102,7 @@ for (let i = 0; i < geoms.length; i++) {
 }
 
 const { feature } = await import('topojson-client');
-const round = (v) => Math.round(v * 1e4) / 1e4;
+const round = (v) => Math.round(v * 1e5) / 1e5;
 const roundCoords = (c) => (typeof c[0] === 'number' ? [round(c[0]), round(c[1])] : c.map(roundCoords));
 const tidy = (fc) => {
   for (const f of fc.features) f.geometry && (f.geometry.coordinates = roundCoords(f.geometry.coordinates));
@@ -126,7 +126,7 @@ write('labels.json', JSON.parse(readFileSync(cache + 'labels.out.json')));
 // sets, which carry many smaller rivers the world set leaves out.
 mapshaper('-i', 'combine-files', cache + 'rivers.geojson', cache + 'rivers-europe.geojson', cache + 'rivers-north-america.geojson',
   '-merge-layers', 'force', '-filter-fields', 'name,scalerank',
-  '-simplify', '60%', '-o', 'precision=0.0001', cache + 'rivers.out.json');
+  '-o', 'precision=0.00001', cache + 'rivers.out.json');
 write('rivers.json', JSON.parse(readFileSync(cache + 'rivers.out.json')));
 
 // Names need smooth lines to run along: letters will not bend round every
@@ -136,8 +136,8 @@ mapshaper('-i', cache + 'rivers.out.json', '-filter', 'Boolean(name)',
 write('river-names.json', JSON.parse(readFileSync(cache + 'river-names.out.json')));
 
 mapshaper('-i', 'combine-files', cache + 'lakes.geojson', cache + 'lakes-europe.geojson', cache + 'lakes-north-america.geojson',
-  '-merge-layers', 'force', '-filter-fields', 'name,scalerank', '-simplify', '45%', 'keep-shapes',
-  '-o', 'precision=0.0001', cache + 'lakes.out.json');
+  '-merge-layers', 'force', '-filter-fields', 'name,scalerank',
+  '-o', 'precision=0.00001', cache + 'lakes.out.json');
 write('lakes.json', JSON.parse(readFileSync(cache + 'lakes.out.json')));
 
 // -------------------------------------------------------------------- ports
@@ -218,6 +218,24 @@ for (const line of csv.slice(1)) {
   ports.push([r[cN], lon, lat, r[cC], code, 4, zone(lat, lon), -1]);
   added++;
 }
-console.log(`Ports: ${wpi.length} from the World Port Index, ${added} more from UN/LOCODE`);
+// A port that lands out at sea (ocean zones are Etc/GMT±n) is either an
+// offshore terminal or has a wrong position in its source; either way it
+// keeps its country's clocks, so give it the country's commonest zone.
+const commonest = new Map();
+for (const p of ports) {
+  if (p[6].startsWith('Etc/')) continue;
+  const m = commonest.get(p[3]) || new Map();
+  m.set(p[6], (m.get(p[6]) || 0) + 1);
+  commonest.set(p[3], m);
+}
+let moved = 0;
+for (const p of ports) {
+  const m = commonest.get(p[3]);
+  if (p[6].startsWith('Etc/') && m) {
+    p[6] = [...m.entries()].sort((a, b) => b[1] - a[1])[0][0];
+    moved++;
+  }
+}
+console.log(`Ports: ${wpi.length} from the World Port Index, ${added} more from UN/LOCODE; ${moved} at sea given their country's zone`);
 write('ports.json', ports);
 write('details.json', details);
