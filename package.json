@@ -1,0 +1,31 @@
+{
+  "name": "world-map",
+  "version": "1.0.0",
+  "description": "Offline world map of every port, for seafarers",
+  "scripts": {
+    "data": "node tools/build-data.mjs",
+    "vendor": "node tools/vendor.mjs",
+    "start": "python3 -m http.server 8080",
+    "test": "node tests/data.test.mjs",
+    "pilots": "node tools/fetch-pilots.mjs",
+    "icons": "node tools/make-icons.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vaibhavma84-stack/world-map.-.git"
+  },
+  "bugs": {
+    "url": "https://github.com/vaibhavma84-stack/world-map.-/issues"
+  },
+  "homepage": "https://github.com/vaibhavma84-stack/world-map.-#readme",
+  "devDependencies": {
+    "geo-tz": "^8.1.9",
+    "maplibre-gl": "^4.7.1",
+    "mapshaper": "^0.6.102",
+    "seaport-data-js": "^1.0.1",
+    "topojson-client": "^3.1.0",
+    "topojson-server": "^3.0.1"
+  },
+  "type": "module",
+  "private": true
+}

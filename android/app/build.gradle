@@ -1,0 +1,50 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.worldmap.app'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'com.worldmap.app'
+        minSdk 26
+        targetSdk 34
+        // Each build from GitHub counts up, so a new APK installs over the old one.
+        versionCode((System.getenv('VERSION_CODE') ?: '1') as int)
+        versionName(System.getenv('VERSION_NAME') ?: '1.0')
+    }
+
+    // One fixed key, kept with the project, so every build can update the app
+    // already installed rather than needing it removed first.
+    signingConfigs {
+        release {
+            storeFile file('release.keystore')
+            storePassword 'worldmap'
+            keyAlias 'worldmap'
+            keyPassword 'worldmap'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+    }
+
+    // The map data is already compact JSON; leave it uncompressed in the APK
+    // so it is read straight from the file.
+    androidResources {
+        noCompress 'json', 'pbf'
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation 'androidx.webkit:webkit:1.11.0'
+}

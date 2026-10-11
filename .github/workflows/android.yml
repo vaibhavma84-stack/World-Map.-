@@ -1,0 +1,82 @@
+name: Android app
+
+# Builds World Map as an APK and publishes it on the repository's Releases
+# page, to download onto the phone and open to install.
+on:
+  push:
+    paths-ignore:
+      - 'README.md'
+  workflow_run:
+    workflows: ["Pilot boarding places"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_branch || github.ref }}
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Put the app inside the APK
+        run: |
+          A=android/app/src/main/assets
+          rm -rf "$A" && mkdir -p "$A"
+          cp index.html manifest.webmanifest "$A/"
+          cp -r css js data fonts vendor icons "$A/"
+          du -sh "$A"
+
+      - name: Build
+        working-directory: android
+        env:
+          VERSION_CODE: ${{ github.run_number }}
+          VERSION_NAME: 1.${{ github.run_number }}
+        run: |
+          set -o pipefail
+          if ! gradle --no-daemon assembleRelease 2>&1 | tee build.log; then
+            { grep -iE "error" build.log | grep -v "^> Task" | head -6; tail -n 12 build.log; } | while IFS= read -r line; do
+              echo "::error::$line"
+            done
+            exit 1
+          fi
+
+      - name: Name the APK
+        run: |
+          mkdir -p out
+          cp android/app/build/outputs/apk/release/app-release.apk "out/WorldMap-1.${{ github.run_number }}.apk"
+          ls -la out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WorldMap-apk
+          path: out/*.apk
+
+      - name: Publish on Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: world-map-1.${{ github.run_number }}
+          name: World Map 1.${{ github.run_number }}
+          target_commitish: ${{ github.sha }}
+          make_latest: true
+          body: |
+            World Map for Android. Download the .apk below on the phone and open it to install.
+            Built from ${{ github.sha }}.
+          files: out/*.apk

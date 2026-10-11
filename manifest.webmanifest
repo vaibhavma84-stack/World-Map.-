@@ -1,0 +1,15 @@
+{
+  "name": "World Map",
+  "short_name": "World Map",
+  "description": "Offline world map of every port, with local time, currency and particulars.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#b7d7ec",
+  "theme_color": "#b7d7ec",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
