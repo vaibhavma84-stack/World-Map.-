@@ -40,18 +40,6 @@ const load = (f) => fetch(`data/${f}.json`).then((r) => {
 const [countries, borders, labels, rivers, riverNames, lakes, portRows] = await Promise.all(
   ['countries', 'borders', 'labels', 'rivers', 'river-names', 'lakes', 'ports'].map(load),
 );
-// Pilot boarding places from OpenSeaMap, fetched by a job on GitHub. The app
-// works without them; the file may be empty until that job has run.
-const pilotRows = await fetch('data/pilots.json').then((r) => (r.ok ? r.json() : [])).catch(() => []);
-const pilots = pilotRows.map(([lon, lat, name, category, channel, info], i) => ({ i, lon, lat, name, category, channel, info }));
-const pilotFeatures = {
-  type: 'FeatureCollection',
-  features: pilots.map((b) => ({
-    type: 'Feature', geometry: { type: 'Point', coordinates: [b.lon, b.lat] },
-    properties: { i: b.i, label: b.name ? `Pilot · ${b.name}` : 'Pilot' },
-  })),
-};
-
 // Exchange rates against the US dollar: the copy saved into the app by a
 // daily job on GitHub, replaced by a fresh one whenever there is a connection.
 let rates = await fetch('data/rates.json').then((r) => r.json()).catch(() => ({ date: null, rates: {} }));
@@ -121,7 +109,6 @@ const style = {
     lakes: { type: 'geojson', data: lakes, tolerance: 0.05, maxzoom: 14 },
     grid: { type: 'geojson', data: graticule() },
     ports: { type: 'geojson', data: portFeatures, maxzoom: 12, buffer: 64 },
-    pilots: { type: 'geojson', data: pilotFeatures },
     // OpenSeaMap's chart symbols: traffic separation schemes, recommended
     // tracks and routes, lights, buoys and beacons. Drawn by OpenSeaMap and
     // fetched when there is a connection; tiles seen once are kept on the phone.
@@ -220,30 +207,6 @@ const style = {
       paint: { 'text-color': '#12324a', ...halo },
     })),
     { id: 'seamarks', type: 'raster', source: 'seamarks', minzoom: 5, layout: { visibility: 'none' } },
-    // Pilot boarding places: magenta, as on the chart.
-    {
-      id: 'pilots', type: 'circle', source: 'pilots', minzoom: 4,
-      paint: {
-        'circle-color': '#b0187a', 'circle-radius': zoomed([[4, 4], [10, 8]]),
-        'circle-stroke-color': '#ffffff', 'circle-stroke-width': 1.5,
-      },
-    },
-    {
-      id: 'pilot-p', type: 'symbol', source: 'pilots', minzoom: 6,
-      layout: {
-        'text-field': 'P', 'text-font': ['OpenSans-Bold'], 'text-size': zoomed([[6, 8], [10, 11]]),
-        'text-allow-overlap': true, 'text-ignore-placement': true,
-      },
-      paint: { 'text-color': '#ffffff' },
-    },
-    {
-      id: 'pilot-names', type: 'symbol', source: 'pilots', minzoom: 8,
-      layout: {
-        'text-field': ['get', 'label'], 'text-font': ['OpenSans-Semibold'], 'text-size': 11,
-        'text-anchor': 'top', 'text-offset': [0, 0.9], 'text-max-width': 10,
-      },
-      paint: { 'text-color': '#8e1062', ...halo },
-    },
     {
       id: 'picked', type: 'circle', source: 'picked',
       paint: { 'circle-radius': 9, 'circle-color': 'rgba(0,0,0,0)', 'circle-stroke-color': '#d2462f', 'circle-stroke-width': 3 },
@@ -294,12 +257,9 @@ map.getCanvas().addEventListener('mouseleave', () => { $('#coords').textContent 
 map.on('click', (e) => {
   const pad = 12;
   const box = [[e.point.x - pad, e.point.y - pad], [e.point.x + pad, e.point.y + pad]];
-  const pilotHit = map.queryRenderedFeatures(box, { layers: ['pilots'] })[0];
   const currentHit = shown.currents && map.getLayer('currents-line') && map.queryRenderedFeatures(box, { layers: ['currents-line'] })[0];
   const hits = map.queryRenderedFeatures(box, { layers: PORT_LAYERS });
-  if (pilotHit && (!hits.length || map.getZoom() >= 8)) {
-    showPilot(pilots[pilotHit.properties.i]);
-  } else if (!hits.length && currentHit) {
+  if (!hits.length && currentHit) {
     showCurrent(currentHit.properties);
   } else if (hits.length) {
     const best = hits
@@ -316,7 +276,7 @@ const dist2 = (e, p) => {
   const q = map.project([p.lon, p.lat]);
   return (q.x - e.point.x) ** 2 + (q.y - e.point.y) ** 2;
 };
-for (const layer of [...PORT_LAYERS, 'pilots']) {
+for (const layer of PORT_LAYERS) {
   map.on('mouseenter', layer, () => { map.getCanvas().style.cursor = 'pointer'; });
   map.on('mouseleave', layer, () => { map.getCanvas().style.cursor = ''; });
 }
@@ -325,11 +285,10 @@ for (const layer of [...PORT_LAYERS, 'pilots']) {
 const LAYER_GROUPS = {
   seamarks: ['seamarks'],
   currents: ['currents-line', 'currents-arrows', 'currents-names'],
-  pilots: ['pilots', 'pilot-p', 'pilot-names'],
   rivers: ['rivers-0', 'rivers-6', 'rivers-9', 'river-names-0', 'river-names-5', 'river-names-9', 'lakes', 'lake-names'],
   grid: ['grid'],
 };
-const shown = { seamarks: true, currents: true, pilots: true, rivers: true, grid: true, weather: false, ...store.get('layers', {}) };
+const shown = { seamarks: true, currents: true, rivers: true, grid: true, weather: false, ...store.get('layers', {}) };
 let wx = null;
 function applyLayers() {
   for (const [group, ids] of Object.entries(LAYER_GROUPS)) {
@@ -620,7 +579,6 @@ function showPort(p) {
         <div class="note">Enter the ETA in port time.</div>
         <dl id="eta-out"></dl>
       </div>
-      ${pilotCard(p)}
       <div class="card tide" id="c-tide"><h3>Tide</h3><div class="note">Loading…</div></div>
       <div id="c-facts"></div>
     </div>
@@ -641,43 +599,6 @@ function showPort(p) {
   }
 }
 
-// Great-circle distance in nautical miles, and the initial true bearing.
-function legFrom(a, b) {
-  const r = Math.PI / 180;
-  const [f1, f2, dl] = [a.lat * r, b.lat * r, (b.lon - a.lon) * r];
-  const h = Math.sin((f2 - f1) / 2) ** 2 + Math.cos(f1) * Math.cos(f2) * Math.sin(dl / 2) ** 2;
-  const nm = 2 * 3440.065 * Math.asin(Math.min(1, Math.sqrt(h)));
-  const y = Math.sin(dl) * Math.cos(f2);
-  const x = Math.cos(f1) * Math.sin(f2) - Math.sin(f1) * Math.cos(f2) * Math.cos(dl);
-  const brg = ((Math.atan2(y, x) / r) + 360) % 360;
-  return { nm, brg };
-}
-
-function pilotsNear(p, maxNm = 40, max = 4) {
-  return pilots
-    .filter((b) => Math.abs(b.lat - p.lat) < 1 && Math.abs(((b.lon - p.lon + 540) % 360) - 180) < 1.5)
-    .map((b) => ({ b, ...legFrom(p, b) }))
-    .filter((x) => x.nm <= maxNm)
-    .sort((a, z) => a.nm - z.nm)
-    .slice(0, max);
-}
-
-function pilotCard(p) {
-  if (!pilots.length) {
-    return `<div class="card"><h3>Pilot boarding</h3><div class="note">Pilot boarding places have not been downloaded yet.</div></div>`;
-  }
-  const near = pilotsNear(p);
-  if (!near.length) {
-    return `<div class="card"><h3>Pilot boarding</h3><div class="note">None mapped within 40 nm in OpenSeaMap. Check ALRS Vol. 6 or the agent.</div></div>`;
-  }
-  return `<div class="card"><h3>Pilot boarding</h3><ul class="pilots">${near.map(({ b, nm, brg }) => `
-    <li><button type="button" data-pilot="${b.i}">
-      <span class="pos">${position(b.lat, b.lon)}</span>
-      <span class="note">${nm.toFixed(1)} nm ${String(Math.round(brg) % 360).padStart(3, '0')}° from the port${b.name ? ` · ${esc(b.name)}` : ''}${b.channel ? ` · VHF ${esc(b.channel)}` : ''}</span>
-    </button></li>`).join('')}</ul>
-    <div class="note">OpenSeaMap; check ALRS Vol. 6 before relying on it.</div></div>`;
-}
-
 function showCurrent(c) {
   clearInterval(ticker);
   current = null;
@@ -689,29 +610,6 @@ function showCurrent(c) {
       <div class="card"><h3>Usual rate</h3><div class="big">${esc(c.rate)}</div>${c.note ? `<div class="note">${esc(c.note)}</div>` : ''}</div>
       <div class="card"><div class="note">The line is the current's usual axis. It shifts with season and weather; turn on Weather → Current for the set and drift forecast for today.</div></div>
     </div>`);
-}
-
-function showPilot(b) {
-  clearInterval(ticker);
-  current = null;
-  map.getSource('picked').setData({ type: 'Feature', geometry: { type: 'Point', coordinates: [b.lon, b.lat] }, properties: {} });
-  const nearest = ports
-    .filter((p) => Math.abs(p.lat - b.lat) < 1 && Math.abs(p.lon - b.lon) < 1.5)
-    .map((p) => ({ p, ...legFrom(b, p) }))
-    .sort((a, z) => a.nm - z.nm)[0];
-  const rows = [
-    ['Position', position(b.lat, b.lon)], ['Name', b.name], ['Category', b.category],
-    ['VHF', b.channel], ['Information', b.info],
-    ['Nearest port', nearest ? `${nearest.p.name} · ${nearest.nm.toFixed(1)} nm` : ''],
-  ].filter(([, v]) => v);
-  openPanel(`
-    <h1>Pilot boarding</h1>
-    <p class="sub">${esc(b.name || 'OpenSeaMap pilot boarding place')}</p>
-    <div class="cards"><div class="card"><table class="facts">${
-      rows.map(([k, v]) => `<tr><th>${esc(k)}</th><td>${esc(v)}</td></tr>`).join('')}</table></div>
-      ${nearest ? `<button type="button" class="card linkish" data-port="${nearest.p.i}">Open ${esc(nearest.p.name)} →</button>` : ''}
-    </div>
-    <p class="source">© OpenStreetMap contributors (OpenSeaMap), ODbL. Not for navigation; check ALRS Vol. 6.</p>`);
 }
 
 function tick() {
@@ -843,16 +741,8 @@ function openSettings() {
 $('#settings-btn').onclick = openSettings;
 body.addEventListener('click', (e) => {
   if (e.target.closest('[data-settings]')) { e.preventDefault(); openSettings(); }
-  const pb = e.target.closest('[data-pilot]');
-  if (pb) {
-    const b = pilots[+pb.dataset.pilot];
-    showPilot(b);
-    map.flyTo({ center: [b.lon, b.lat], zoom: Math.max(map.getZoom(), 10), padding: clearOfPanel() });
-  }
   const cb = e.target.closest('[data-country]');
   if (cb) openCountry(cb.dataset.country);
-  const pp = e.target.closest('[data-port]');
-  if (pp) choose(ports[+pp.dataset.port]);
 });
 dialog.addEventListener('close', () => {
   settings.homeTz = tzSelect.value || deviceZone;

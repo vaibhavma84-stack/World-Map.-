@@ -10,8 +10,6 @@ connection once it is installed.
 - **12,700+ ports**: all 3,802 in the NGA World Port Index, plus about 8,900
   more UN/LOCODE ports (many inland, along rivers). Every one is named, and
   smaller ports appear as you zoom in.
-- **Pilot boarding places** from OpenSeaMap, shown as magenta **P** markers.
-  Each port's card lists the nearest ones within 40 nm.
 - **Tap a port** to see:
   - local time, its UTC offset and the next clock change
   - how far to advance or retard the ship's clock
@@ -63,15 +61,10 @@ save the map for offline use.
 | Countries, borders, rivers, lakes | [Natural Earth](https://www.naturalearthdata.com) 1:10m | Public domain |
 | Ports and particulars | NGA World Port Index (Pub. 150), via [seaport-data-js](https://www.npmjs.com/package/seaport-data-js) | CC BY 4.0 |
 | More ports | [UN/LOCODE](https://unece.org/trade/uncefact/unlocode) | Free to use |
-| Pilot boarding places | [OpenSeaMap](https://openseamap.org) / OpenStreetMap | ODbL |
 | Time zones of ports | [geo-tz](https://github.com/evansiroky/node-geo-tz) | MIT / ODbL |
 | Weather, sea state, tides | [Open-Meteo](https://open-meteo.com) | CC BY 4.0 |
 | Chart marks | [OpenSeaMap](https://openseamap.org) | CC BY-SA |
 | Exchange rates | [ExchangeRate-API](https://www.exchangerate-api.com) | Free, with attribution |
-
-Pilot boarding places only cover what volunteers have mapped. Coverage is good
-in Europe and at many large ports, and thin elsewhere. The official list is the
-Admiralty List of Radio Signals Vol. 6.
 
 ## Building
 
@@ -84,5 +77,5 @@ npm test
 npm start        # http://localhost:8080
 ```
 
-`npm run pilots` needs the Overpass servers. It runs on GitHub every month, and
-whenever its script changes (see `.github/workflows/pilots.yml`).
+Pilot boarding positions are deliberately left out: they move, and only the
+agent's or the latest ALRS Vol. 6 position should be used.

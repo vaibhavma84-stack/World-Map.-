@@ -50,11 +50,6 @@ ok(unknown.length === 0, `countries without currency: ${unknown}`);
 const details = json('details');
 ok(ports.filter((p) => p[7] >= 0).every((p) => details[p[7]]), 'every World Port Index port has particulars');
 
-// Pilots: either not yet fetched, or well-formed.
-const pilots = json('pilots');
-ok(Array.isArray(pilots) && pilots.every((b) => b.length === 6 && Math.abs(b[0]) <= 180 && Math.abs(b[1]) <= 90), 'pilots well-formed');
-ok(!pilots.some((b) => /TEST/i.test(b[2])), 'no test data in pilots');
-
 // Every file the offline copy keeps exists.
 const sw = readFileSync(`${root}sw.js`, 'utf8');
 const ranges = eval(sw.match(/const RANGES = (\[[^\]]*\])/)[1]);
