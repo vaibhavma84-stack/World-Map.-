@@ -36,7 +36,7 @@ OUT = os.path.join(ROOT, 'data', 'coast')
 SOURCE = 'https://osmdata.openstreetmap.de/download/land-polygons-split-4326.zip'
 
 RADIUS_KM = {0: 10, 1: 10, 2: 10, 3: 10, 4: 4}  # by port rank; 4 = UN/LOCODE only
-TOLERANCE = 0.00002  # degrees, about 2 m: simplify below what shows at zoom 16
+TOLERANCE = 0.00004  # degrees, about 4 m: under a pixel at harbour zoom
 GRID = 1e-5          # coordinates kept to about 1 m
 
 
@@ -100,9 +100,12 @@ def main():
         # The shoreline: the edge of the land, less where it was cut off at
         # the edge of the circle or the square, which is not shore.
         shore = shapely.difference(here.boundary, shapely.buffer(mask.boundary, 1e-6))
-        shore = shapely.line_merge(shapely.simplify(shore, TOLERANCE))
-        if not shore.is_empty:
-            features.append(feature(shore, {'kind': 'shore'}))
+        lines = [g for g in shapely.get_parts(shore) if g.geom_type == 'LineString' and not g.is_empty]
+        if lines:
+            shore = shapely.line_merge(shapely.MultiLineString(lines))
+            shore = shapely.simplify(shore, TOLERANCE)
+            if shore is not None and not shore.is_empty:
+                features.append(feature(shore, {'kind': 'shore'}))
         taken = shapely.Polygon()
         # Where ports of different countries overlap, the larger group colours it.
         for c, parts in sorted(by_colour.items(), key=lambda kv: -len(kv[1])):
