@@ -50,11 +50,20 @@ ok(unknown.length === 0, `countries without currency: ${unknown}`);
 const details = json('details');
 ok(ports.filter((p) => p[7] >= 0).every((p) => details[p[7]]), 'every World Port Index port has particulars');
 
+// Harbour coastlines: once built, every square listed is there.
+if (existsSync(`${root}data/coast/index.json`)) {
+  const idx = json('coast/index');
+  const keys = Object.keys(idx.cells);
+  ok(keys.length > 1000, `coast squares: ${keys.length}`);
+  ok(keys.every((k) => existsSync(`${root}data/coast/${k}.json`)), 'every coast square present');
+}
+
 // Every file the offline copy keeps exists.
 const sw = readFileSync(`${root}sw.js`, 'utf8');
 const ranges = eval(sw.match(/const RANGES = (\[[^\]]*\])/)[1]);
 const fonts = eval(sw.match(/const FONTS = (\[[^\]]*\])/)[1]);
-const files = [...sw.matchAll(/'([^']+\.(?:html|css|js|json|png|webmanifest))'/g)].map((m) => m[1]);
+const files = [...sw.matchAll(/'([^']+\.(?:html|css|js|json|png|webmanifest))'/g)].map((m) => m[1]).filter((f) => !f.startsWith('data/coast/') && f !== 'index.json');
+// (data/coast/index.json is cached only once the coastline job has made it.)
 for (const f of [...files, ...fonts.flatMap((n) => ranges.map((r) => `fonts/${n}/${r}.pbf`))]) {
   ok(existsSync(root + f), `offline file missing: ${f}`);
 }

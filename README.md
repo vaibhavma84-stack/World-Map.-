@@ -7,6 +7,7 @@ connection once it is installed.
   countries that share a border have the same colour. Borders are dashed.
 - **Rivers and lakes**, with their names drawn along them. Natural Earth's
   extra-detailed sets are used for Europe and North America.
+- **Harbour coastlines** from OpenStreetMap round every port, from zoom 8.
 - **12,700+ ports**: all 3,802 in the NGA World Port Index, plus about 8,900
   more UN/LOCODE ports (many inland, along rivers). Every one is named, and
   smaller ports appear as you zoom in.
@@ -59,6 +60,7 @@ save the map for offline use.
 | What | Source | Licence |
 |---|---|---|
 | Countries, borders, rivers, lakes | [Natural Earth](https://www.naturalearthdata.com) 1:10m | Public domain |
+| Harbour coastlines | [OpenStreetMap](https://osmdata.openstreetmap.de) land polygons | ODbL |
 | Ports and particulars | NGA World Port Index (Pub. 150), via [seaport-data-js](https://www.npmjs.com/package/seaport-data-js) | CC BY 4.0 |
 | More ports | [UN/LOCODE](https://unece.org/trade/uncefact/unlocode) | Free to use |
 | Time zones of ports | [geo-tz](https://github.com/evansiroky/node-geo-tz) | MIT / ODbL |

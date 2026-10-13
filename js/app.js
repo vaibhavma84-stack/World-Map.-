@@ -107,6 +107,7 @@ const style = {
     rivers: { type: 'geojson', data: rivers, tolerance: 0.05, maxzoom: 14 },
     riverNames: { type: 'geojson', data: riverNames, maxzoom: 10 },
     lakes: { type: 'geojson', data: lakes, tolerance: 0.05, maxzoom: 14 },
+    detail: { type: 'geojson', data: { type: 'FeatureCollection', features: [] }, tolerance: 0.1, maxzoom: 16 },
     grid: { type: 'geojson', data: graticule() },
     ports: { type: 'geojson', data: portFeatures, maxzoom: 12, buffer: 64 },
     // OpenSeaMap's chart symbols: traffic separation schemes, recommended
@@ -137,6 +138,18 @@ const style = {
     {
       id: 'coast', type: 'line', source: 'countries',
       paint: { 'line-color': '#6f97b3', 'line-width': zoomed([[1, 0.4], [6, 0.9], [10, 1.4]]) },
+    },
+    // Round the ports, from zoom 8: OpenStreetMap's coastline, good to a few
+    // metres, laid over Natural Earth's. The mask clears the coarse land in
+    // the covered circle; the detailed land and its shoreline go on top.
+    { id: 'detail-mask', type: 'fill', source: 'detail', minzoom: 8, filter: ['==', ['get', 'kind'], 'mask'], paint: { 'fill-color': SEA, 'fill-antialias': false } },
+    {
+      id: 'detail-land', type: 'fill', source: 'detail', minzoom: 8, filter: ['==', ['get', 'kind'], 'land'],
+      paint: { 'fill-color': ['to-color', ['at', ['get', 'c'], ['literal', PASTELS]]], 'fill-antialias': true },
+    },
+    {
+      id: 'detail-shore', type: 'line', source: 'detail', minzoom: 8, filter: ['==', ['get', 'kind'], 'shore'],
+      paint: { 'line-color': '#6f97b3', 'line-width': zoomed([[8, 0.8], [12, 1.3], [16, 2]]) },
     },
     { id: 'lakes', type: 'fill', source: 'lakes', paint: { 'fill-color': SEA, 'fill-outline-color': '#6f97b3' } },
     // Rivers by importance (Natural Earth scalerank: 0 the greatest).
@@ -280,6 +293,36 @@ for (const layer of PORT_LAYERS) {
   map.on('mouseenter', layer, () => { map.getCanvas().style.cursor = 'pointer'; });
   map.on('mouseleave', layer, () => { map.getCanvas().style.cursor = ''; });
 }
+
+// ------------------------------------------------------- detailed coastlines
+// Built by a job on GitHub into data/coast/, one file per 1° square near a
+// port. Loaded for the squares on screen from zoom 8; the phone keeps each
+// one it has fetched (and Settings can save them all for sea).
+const coastIndex = await fetch('data/coast/index.json').then((r) => (r.ok ? r.json() : null)).catch(() => null);
+const coastCells = new Map();
+const coastUrl = (k) => `data/coast/${k}.json?v=${coastIndex.built}`;
+let coastBusy = false;
+async function loadCoast() {
+  if (!coastIndex || coastBusy || map.getZoom() < 7.5) return;
+  const b = map.getBounds();
+  const want = [];
+  for (let y = Math.floor(b.getSouth()); y <= Math.floor(b.getNorth()); y++) {
+    for (let x = Math.floor(b.getWest()); x <= Math.floor(b.getEast()); x++) {
+      const k = `${y}_${((x + 180) % 360 + 360) % 360 - 180}`;
+      if (coastIndex.cells[k] && !coastCells.has(k)) want.push(k);
+    }
+  }
+  if (!want.length || want.length > 40) return;
+  coastBusy = true;
+  await Promise.all(want.map((k) => fetch(coastUrl(k)).then((r) => r.json())
+    .then((fc) => coastCells.set(k, fc.features)).catch(() => {})));
+  // Keep the most recent few hundred squares in memory.
+  while (coastCells.size > 300) coastCells.delete(coastCells.keys().next().value);
+  map.getSource('detail').setData({ type: 'FeatureCollection', features: [...coastCells.values()].flat() });
+  coastBusy = false;
+}
+map.on('moveend', loadCoast);
+map.on('load', loadCoast);
 
 // -------------------------------------------------------------------- layers
 const LAYER_GROUPS = {
@@ -731,6 +774,32 @@ tzSelect.innerHTML = zones.map((z) => `<option value="${esc(z)}">${esc(z.replace
 const shipOptions = ['<option value="">Not set</option>'];
 for (let m = -12 * 60; m <= 14 * 60; m += 30) shipOptions.push(`<option value="${m}">${formatOffset(m)}</option>`);
 shipSelect.innerHTML = shipOptions.join('');
+
+// Save every detailed coastline square on the phone, for use at sea. The
+// Android app already carries them; this is for the iPhone's saved copy.
+const saveCoast = $('#save-coast');
+if (!coastIndex || !('serviceWorker' in navigator) || /appassets\.androidplatform\.net/.test(location.host)) {
+  saveCoast.closest('.save-coast').hidden = true;
+} else {
+  const keys = Object.keys(coastIndex.cells);
+  const mb = (Object.values(coastIndex.cells).reduce((a, b) => a + b, 0) / 1e6).toFixed(0);
+  saveCoast.textContent = `Save all harbour coastlines (${mb} MB)`;
+  saveCoast.onclick = async () => {
+    saveCoast.disabled = true;
+    let done = 0, failed = 0;
+    const next = async () => {
+      while (keys.length) {
+        const k = keys.shift();
+        try { const r = await fetch(coastUrl(k)); if (!r.ok) failed++; await r.arrayBuffer(); } catch { failed++; }
+        done++;
+        if (done % 20 === 0) saveCoast.textContent = `Saving… ${done} / ${done + keys.length}`;
+      }
+    };
+    await Promise.all([next(), next(), next(), next()]);
+    saveCoast.textContent = failed ? `Saved ${done - failed}; ${failed} failed — try again with a connection` : 'All harbour coastlines saved';
+    saveCoast.disabled = failed === 0;
+  };
+}
 
 function openSettings() {
   tzSelect.value = settings.homeTz;

@@ -15,13 +15,16 @@ const FILES = [
 ];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(VERSION).then((c) => c.addAll(FILES)).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(VERSION)
+    // The coastline index exists once the coastline job has run.
+    .then((c) => c.addAll(FILES).then(() => c.add('data/coast/index.json').catch(() => {})))
+    .then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', (e) => {
   e.waitUntil(caches.keys()
     
-    .then((keys) => Promise.all(keys.filter((k) => k !== VERSION && k !== TILES).map((k) => caches.delete(k))))
+    .then((keys) => Promise.all(keys.filter((k) => k !== VERSION && k !== TILES && k !== COAST).map((k) => caches.delete(k))))
     .then(() => self.clients.claim()));
 });
 
@@ -42,8 +45,25 @@ async function seamarkTile(request) {
   return res;
 }
 
+// Detailed harbour coastlines: each square kept once fetched. The address
+// carries the data's build date, so a rebuilt set is fetched afresh.
+const COAST = 'wm-coast';
+async function coastSquare(request) {
+  const cache = await caches.open(COAST);
+  const hit = await cache.match(request);
+  if (hit) return hit;
+  const res = await fetch(request);
+  if (res.ok) await cache.put(request, res.clone());
+  return res;
+}
+
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;
+  const url = new URL(e.request.url);
+  if (url.origin === location.origin && url.pathname.includes('/data/coast/') && !url.pathname.endsWith('index.json')) {
+    e.respondWith(coastSquare(e.request));
+    return;
+  }
   if (new URL(e.request.url).host === 'tiles.openseamap.org') { e.respondWith(seamarkTile(e.request)); return; }
   if (new URL(e.request.url).origin !== location.origin) return;
   e.respondWith(caches.match(e.request, { ignoreSearch: true }).then((hit) => hit || fetch(e.request)));

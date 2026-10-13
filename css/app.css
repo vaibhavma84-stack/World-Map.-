@@ -204,8 +204,12 @@ table.words { width: 100%; border-collapse: collapse; margin-top: 6px; }
 .hint { color: var(--muted); font-size: 13px; margin: 0 0 10px; }
 .hint.small { font-size: 12px; }
 .row-end { display: flex; justify-content: flex-end; }
+.secondary { width: 100%; background: var(--chip); color: var(--ink); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; font-weight: 600; margin-bottom: 6px; }
+.secondary:disabled { opacity: .7; }
 .primary { background: var(--accent); color: #fff; border: 0; border-radius: 10px; padding: 8px 18px; font-weight: 600; }
-@media (prefers-color-scheme: dark) { .primary { color: #0d1720; } }
+@media (prefers-color-scheme: dark) { .secondary { width: 100%; background: var(--chip); color: var(--ink); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; font-weight: 600; margin-bottom: 6px; }
+.secondary:disabled { opacity: .7; }
+.primary { color: #0d1720; } }
 
 /* Map popups and controls follow the pastel map, not the theme. */
 .maplibregl-ctrl-attrib { font-size: 11px; }

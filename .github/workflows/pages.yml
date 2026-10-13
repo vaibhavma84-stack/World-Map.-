@@ -7,10 +7,10 @@ on:
     branches: [main, claude/next-port-app]
     paths-ignore:
       - 'android/**'
-  # A commit made by the rates job does not start other workflows by itself,
+  # A commit made by the rates or coastline job does not start other workflows by itself,
   # so listen for that job finishing.
   workflow_run:
-    workflows: ["Exchange rates"]
+    workflows: ["Exchange rates", "Port coastlines"]
     types: [completed]
   workflow_dispatch:
 
@@ -33,7 +33,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # After the rates job, publish what it just committed.
+          # After those jobs, publish what it just committed.
           ref: ${{ github.event.workflow_run.head_branch || github.ref }}
 
       - uses: actions/configure-pages@v5
