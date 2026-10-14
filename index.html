@@ -37,6 +37,9 @@
     <button id="layers-btn" class="icon round" type="button" aria-label="Map layers" aria-expanded="false">
       <svg viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5 9-5z"/><path d="m3 13 9 5 9-5"/></svg>
     </button>
+    <button id="ship-btn" class="icon round" type="button" aria-label="My ship: position, course and weather ahead">
+      <svg viewBox="0 0 24 24"><path d="M12 3v7M8 6h8M4 13h16l-2.5 5.5h-11z"/><path d="M3 21c1.5 0 1.5-1 3-1s1.5 1 3 1 1.5-1 3-1 1.5 1 3 1 1.5-1 3-1 1.5 1 3 1"/></svg>
+    </button>
     <button id="locate" class="icon round" type="button" aria-label="Show my position">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
     </button>
@@ -75,6 +78,11 @@
     <div id="wx-status" class="wx-status"></div>
   </div>
 
+  <div id="hint" class="hint-bar" hidden>
+    <span id="hint-text"></span>
+    <button id="hint-done" type="button" class="primary">Done</button>
+  </div>
+
   <div id="coords" class="coords" aria-live="off"></div>
 
   <section id="panel" class="panel" hidden aria-live="polite">
@@ -99,7 +107,9 @@
       </label>
       <div class="save-coast">
         <button id="save-coast" type="button" class="secondary">Save all harbour coastlines</button>
-        <p class="hint">Detailed coastlines show round ports from zoom 8. Each area is kept once viewed; this saves them all for use at sea.</p>
+        <p class="hint">Detailed harbour coastlines (with rivers and docks) show from zoom 8. Each area is kept once viewed; this saves them all for use at sea.</p>
+        <button id="save-world" type="button" class="secondary" hidden>Save the whole world's coastline</button>
+        <p class="hint" id="save-world-hint" hidden>The detailed coast everywhere, port or not. Areas you look at are kept anyway; this saves the lot.</p>
       </div>
       <p class="hint">Set the ship's clock to the zone time kept on board, and the port card says how far to advance or retard.</p>
       <p class="hint small">Map: Natural Earth; harbour coastlines © OpenStreetMap contributors. Ports: NGA World Port Index (via seaport-data-js, CC BY 4.0) and UN/LOCODE. Not for navigation.</p>
@@ -108,6 +118,7 @@
   </dialog>
 
   <script src="vendor/maplibre-gl.js"></script>
+  <script src="vendor/pmtiles.js"></script>
   <script type="module" src="js/app.js"></script>
 </body>
 </html>

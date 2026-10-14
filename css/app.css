@@ -219,3 +219,37 @@ table.words { width: 100%; border-collapse: collapse; margin-top: 6px; }
 
 /* Map popups and controls follow the pastel map, not the theme. */
 .maplibregl-ctrl-attrib { font-size: 11px; }
+
+/* ---- my ship ---- */
+.hint-bar {
+  position: fixed; left: 50%; transform: translateX(-50%); top: calc(env(safe-area-inset-top, 0px) + 64px); z-index: 4;
+  display: flex; align-items: center; gap: 10px; max-width: calc(100vw - 32px);
+  background: var(--card-solid); color: var(--ink); border-radius: 12px; box-shadow: var(--shadow);
+  padding: 8px 8px 8px 14px; font-size: 14px; font-weight: 600;
+}
+.hint-bar[hidden] { display: none; }
+.voyage { display: grid; gap: 8px; margin: 8px 0 10px; }
+.voyage label { display: grid; gap: 3px; font-size: 13px; color: var(--muted); }
+.voyage input[type="text"], .voyage input:not([type]), .voyage input[type="number"], .voyage input[type="datetime-local"] {
+  font: inherit; font-size: 16px; color: var(--ink); background: var(--chip); border: 1px solid var(--line);
+  border-radius: 10px; padding: 8px 10px; width: 100%; min-width: 0; box-sizing: border-box;
+}
+.voyage .note { color: var(--muted); font-size: 13px; }
+.voyage .warn:empty { display: none; }
+.row-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
+.row-buttons > button { flex: 1 1 0; margin: 0; white-space: nowrap; }
+.seg { display: flex; gap: 6px; }
+.seg label { flex: 1; display: flex; align-items: center; gap: 6px; color: var(--ink); font-size: 14px;
+  background: var(--chip); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
+table.ahead { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.ahead th { text-align: left; vertical-align: top; padding: 8px 8px 8px 0; white-space: nowrap; font-size: 13px; }
+table.ahead td { padding: 8px 0; vertical-align: top; }
+table.ahead tr + tr > * { border-top: 1px solid var(--line); }
+table.ahead tr.lv1 th { box-shadow: inset 3px 0 #e08e0b; padding-left: 8px; }
+table.ahead tr.lv2 th { box-shadow: inset 3px 0 #c0392b; padding-left: 8px; }
+.lv-key { display: block; margin: 4px 0; }
+.lv-key i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin: 0 4px 0 6px; vertical-align: -1px; }
+.lv-key i.k1 { background: #e08e0b; }
+.lv-key i.k2 { background: #c0392b; }
+table.ahead th > span { display: block; font-weight: 400; color: var(--muted); }
+table.ahead th > span.pos { font: 12px/1.35 ui-monospace, Menlo, monospace; margin-top: 2px; }

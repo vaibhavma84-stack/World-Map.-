@@ -31,7 +31,7 @@ jobs:
 
       - name: Tools
         run: |
-          pip install shapely==2.2.0 pyogrio==0.13.0
+          pip install shapely==2.2.0 pyogrio==0.13.0 mapbox-vector-tile==2.2.0 numpy
           sudo apt-get update -q && sudo apt-get install -y -q build-essential libsqlite3-dev zlib1g-dev
           git clone --depth 1 --branch 2.79.0 https://github.com/felt/tippecanoe.git /tmp/tippecanoe
           make -C /tmp/tippecanoe -j4 >/dev/null

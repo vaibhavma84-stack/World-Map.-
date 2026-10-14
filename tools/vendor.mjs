@@ -11,6 +11,9 @@ for (const f of ['maplibre-gl.js', 'maplibre-gl.css', 'LICENSE.txt']) {
   copyFileSync(`${root}node_modules/maplibre-gl/dist/${f === 'LICENSE.txt' ? '../LICENSE.txt' : f}`, `${root}vendor/${f.replace('LICENSE', 'maplibre-LICENSE')}`);
 }
 
+// The reader for the world coastline file (PMTiles), as a plain script.
+copyFileSync(`${root}node_modules/pmtiles/dist/pmtiles.js`, `${root}vendor/pmtiles.js`);
+
 // Every letter any label can show, and so which 256-letter blocks are needed.
 const text = [];
 for (const p of JSON.parse(readFileSync(`${root}data/ports.json`))) text.push(p[0]);

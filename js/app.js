@@ -2,6 +2,7 @@ import { COUNTRIES, countryName, currencyName, currencySymbol, flag } from './co
 import { PHRASES, LANGUAGES, TERMS, languageName } from './languages.js';
 import { setupWeather, tideAt, turningPoints, flowImage } from './weather.js';
 import { currentFeatures } from './currents.js';
+import { setupVoyage } from './voyage.js';
 import {
   offsetMinutes, zonedToUtc, formatOffset, formatSpan, clock, longDate, shipClock,
   nextClockChange, sun, position,
@@ -273,8 +274,10 @@ map.getCanvas().addEventListener('mouseleave', () => { $('#coords').textContent 
 
 // Tap a port, or near one: fingers are wider than dots.
 map.on('click', (e) => {
+  if (voyage?.click(e)) return;
   const pad = 12;
   const box = [[e.point.x - pad, e.point.y - pad], [e.point.x + pad, e.point.y + pad]];
+  if (map.getLayer('voyage-ship') && map.queryRenderedFeatures(box, { layers: ['voyage-ship', 'voyage-ahead'] })[0]) { voyage.open(); return; }
   const gasHit = shown.terminals && map.getLayer('terminals') && map.queryRenderedFeatures(box, { layers: ['terminals'] })[0];
   const currentHit = shown.currents && map.getLayer('currents-line') && map.queryRenderedFeatures(box, { layers: ['currents-line'] })[0];
   const hits = map.queryRenderedFeatures(box, { layers: PORT_LAYERS });
@@ -445,7 +448,37 @@ function addTerminals() {
   }, 'picked');
 }
 
+// ---------------------------------------------------- the world's coastline
+// The whole world's detailed coast (OpenStreetMap land, coloured by country)
+// in one file, data/land.pmtiles, read a piece at a time. From zoom 8 it
+// replaces Natural Earth's coarse outline everywhere, port or not. Android
+// carries the file; the iPhone keeps each piece it has read (or the whole
+// file, from Settings). Used only if the file can be reached at start.
+const WORLD_LAND = new URL('data/land.pmtiles', location.href).href;
+const worldReady = (async () => {
+  try {
+    // Only where pieces of it can be read (206): a whole-file answer means a
+    // server that cannot serve the map from it.
+    const r = await fetch(WORLD_LAND, { headers: { Range: 'bytes=0-126' } });
+    r.body?.cancel();
+    return r.status === 206;
+  } catch { return false; }
+})();
+async function addWorldCoast() {
+  if (!(await worldReady) || typeof pmtiles === 'undefined') return;
+  const protocol = new pmtiles.Protocol();
+  maplibregl.addProtocol('pmtiles', protocol.tile);
+  map.addSource('world', { type: 'vector', url: `pmtiles://${WORLD_LAND}`, maxzoom: 12 });
+  // Sea over Natural Earth's land, then the detailed land: both from zoom 8.
+  map.addLayer({ id: 'world-sea', type: 'background', minzoom: 8, paint: { 'background-color': SEA } }, 'detail-mask');
+  map.addLayer({
+    id: 'world-land', type: 'fill', source: 'world', 'source-layer': 'land', minzoom: 8,
+    paint: { 'fill-color': ['to-color', ['at', ['get', 'c'], ['literal', PASTELS]]], 'fill-antialias': false },
+  }, 'detail-mask');
+}
+
 map.on('load', () => {
+  addWorldCoast();
   addOsmWater();
   addTerminals();
   addCurrents();
@@ -453,6 +486,7 @@ map.on('load', () => {
     bar: $('#wx-bar'), slider: $('#wx-slider'), time: $('#wx-time'), status: $('#wx-status'),
     reload: $('#wx-reload'), kinds: [...document.querySelectorAll('#wx-bar [data-kind]')],
   });
+  voyage = setupVoyage(map, { openPanel, closePanel, $, hint, padding: clearOfPanel });
   applyLayers();
 });
 const layersBox = $('#layers');
@@ -467,6 +501,17 @@ $('#layers-btn').onclick = () => {
 map.on('click', () => { layersBox.hidden = true; });
 
 $('#world').onclick = () => map.flyTo({ center: [70, 15], zoom: 1.6 });
+
+// ------------------------------------------------------------------ my ship
+// Position, time and speed, with a course or waypoints; the weather where the
+// ship will be at +3, 6, 9, 12 and 24 hours.
+let voyage = null;
+function hint(text) {
+  $('#hint-text').textContent = text;
+  $('#hint').hidden = !text;
+}
+$('#hint-done').onclick = () => { hint(''); voyage?.open(); };
+$('#ship-btn').onclick = () => voyage?.open();
 
 // ----------------------------------------------------------------- my place
 // GPS works with no signal, so on board this shows the ship and the ports nearest.
@@ -927,6 +972,34 @@ if (!coastIndex || !('serviceWorker' in navigator) || /appassets\.androidplatfor
     saveCoast.disabled = failed === 0;
   };
 }
+
+// Save the whole world's coastline file on the phone (iPhone; Android has it).
+(async () => {
+  const btn = $('#save-world');
+  if (!('serviceWorker' in navigator) || /appassets\.androidplatform\.net/.test(location.host) || !(await worldReady)) return;
+  let size = '';
+  try {
+    const r = await fetch(WORLD_LAND, { headers: { Range: 'bytes=0-0' } });
+    const total = +(r.headers.get('Content-Range') || '').split('/')[1];
+    if (total) size = ` (${Math.round(total / 1e6)} MB)`;
+  } catch { /* size unknown */ }
+  btn.textContent = `Save the whole world's coastline${size}`;
+  btn.hidden = false;
+  $('#save-world-hint').hidden = false;
+  btn.onclick = async () => {
+    btn.disabled = true;
+    btn.textContent = 'Saving… keep the app open, on Wi-Fi';
+    try {
+      const r = await fetch(WORLD_LAND);
+      await r.arrayBuffer();
+      btn.textContent = r.ok ? 'World coastline saved' : 'Could not save; try again with a connection';
+      btn.disabled = r.ok;
+    } catch {
+      btn.textContent = 'Could not save; try again with a connection';
+      btn.disabled = false;
+    }
+  };
+})();
 
 function openSettings() {
   tzSelect.value = settings.homeTz;

@@ -37,11 +37,15 @@ jobs:
           gradle-version: '8.9'
 
       - name: Put the app inside the APK
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           A=android/app/src/main/assets
           rm -rf "$A" && mkdir -p "$A"
           cp index.html manifest.webmanifest "$A/"
           cp -r css js data fonts vendor icons "$A/"
+          # The world coastline file, kept on the 'world-coast' release.
+          gh release download world-coast -p land.pmtiles -D "$A/data" || echo "No world coastline file yet"
           du -sh "$A"
 
       - name: Build

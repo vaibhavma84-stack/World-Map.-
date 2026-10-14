@@ -23,6 +23,7 @@
     "geo-tz": "^8.1.9",
     "maplibre-gl": "^4.7.1",
     "mapshaper": "^0.6.102",
+    "pmtiles": "^3.2.1",
     "seaport-data-js": "^1.0.1",
     "topojson-client": "^3.1.0",
     "topojson-server": "^3.0.1"

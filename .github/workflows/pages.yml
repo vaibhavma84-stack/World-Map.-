@@ -41,13 +41,23 @@ jobs:
           enablement: true
 
       - name: Stage the site
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p _site
           cp index.html manifest.webmanifest sw.js _site/
           cp -r css js data fonts vendor icons _site/
+          # The world coastline file, kept on the 'world-coast' release.
+          gh release download world-coast -p land.pmtiles -D _site/data || echo "No world coastline file yet"
           # A new version name makes phones fetch the new files.
           sed -i "s/const VERSION = '[^']*'/const VERSION = 'wm-${GITHUB_SHA::8}'/" _site/sw.js
           grep -q "wm-${GITHUB_SHA::8}" _site/sw.js
+          # GitHub Pages takes up to 1 GB: leave the world file out if it would
+          # not fit (the iPhone then keeps the harbour detail only).
+          if [ "$(du -sm _site | cut -f1)" -gt 990 ]; then
+            echo "::warning::Site over 1 GB with the world coastline; leaving it out"
+            rm -f _site/data/land.pmtiles
+          fi
           du -sh _site
 
       - uses: actions/upload-pages-artifact@v3

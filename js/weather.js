@@ -439,3 +439,44 @@ export function turningPoints({ times, h }) {
   }
   return out;
 }
+
+// ---------------------------------------------------------- weather on a track
+// The forecast at given places and times (the ship's projected positions):
+// for each { lat, lon, t }, the hour nearest t. One request for the air, one
+// for the sea, for all the points together.
+export async function weatherAlong(points) {
+  const lat = points.map((p) => p.lat.toFixed(3)).join(',');
+  const lon = points.map((p) => ((((p.lon + 180) % 360) + 360) % 360 - 180).toFixed(3)).join(',');
+  const common = { latitude: lat, longitude: lon, past_days: 2, forecast_days: 7, timezone: 'GMT' };
+  const [air, sea] = await Promise.all([
+    getJson(FORECAST, {
+      ...common, wind_speed_unit: 'kn',
+      hourly: 'wind_speed_10m,wind_direction_10m,wind_gusts_10m,pressure_msl,visibility,temperature_2m,weather_code',
+    }),
+    getJson(MARINE, {
+      ...common, cell_selection: 'sea',
+      hourly: 'wave_height,wave_direction,wave_period,swell_wave_height,swell_wave_direction,swell_wave_period,ocean_current_velocity,ocean_current_direction',
+    }).catch(() => null),
+  ]);
+  const airs = Array.isArray(air) ? air : [air];
+  const seas = sea ? (Array.isArray(sea) ? sea : [sea]) : [];
+  const currentUnit = seas[0]?.hourly_units?.ocean_current_velocity || 'km/h';
+  const toKnots = /kn/.test(currentUnit) ? 1 : /m\/s/.test(currentUnit) ? 1.943844 : KNOT_PER_KMH;
+  return points.map((p, k) => {
+    const a = airs[k]?.hourly, m = seas[k]?.hourly || {};
+    if (!a) return null;
+    const times = a.time.map((t) => Date.parse(`${t}Z`));
+    let i = 0;
+    for (let j = 1; j < times.length; j++) if (Math.abs(times[j] - p.t) < Math.abs(times[i] - p.t)) i = j;
+    if (Math.abs(times[i] - p.t) > 2 * 3600000) return null; // outside the forecast
+    const at = (arr) => (arr && arr[i] != null ? arr[i] : null);
+    return {
+      wind: at(a.wind_speed_10m), windDir: at(a.wind_direction_10m), gust: at(a.wind_gusts_10m),
+      pressure: at(a.pressure_msl), visibility: at(a.visibility), temp: at(a.temperature_2m), code: at(a.weather_code),
+      waves: at(m.wave_height), wavesDir: at(m.wave_direction), wavesPer: at(m.wave_period),
+      swell: at(m.swell_wave_height), swellDir: at(m.swell_wave_direction), swellPer: at(m.swell_wave_period),
+      current: at(m.ocean_current_velocity) == null ? null : at(m.ocean_current_velocity) * toKnots,
+      currentDir: at(m.ocean_current_direction),
+    };
+  });
+}

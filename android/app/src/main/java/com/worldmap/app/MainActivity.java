@@ -17,6 +17,15 @@ import android.webkit.WebViewClient;
 
 import androidx.webkit.WebViewAssetLoader;
 
+import android.content.res.AssetFileDescriptor;
+
+import java.io.FileInputStream;
+import java.io.FilterInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.HashMap;
+import java.util.Map;
+
 /**
  * The map, held inside the app: its pages and data are served from the APK's
  * own assets, so it works with no signal at all.
@@ -52,7 +61,12 @@ public class MainActivity extends Activity {
         web.setWebViewClient(new WebViewClient() {
             @Override
             public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
-                return assets.shouldInterceptRequest(request.getUrl());
+                Uri url = request.getUrl();
+                String path = url.getPath();
+                if (HOST.equals(url.getHost()) && path != null && path.endsWith(".pmtiles")) {
+                    return pieceOf(path.substring("/assets/".length()), request.getRequestHeaders());
+                }
+                return assets.shouldInterceptRequest(url);
             }
 
             @Override
@@ -86,6 +100,59 @@ public class MainActivity extends Activity {
 
         if (saved != null) web.restoreState(saved);
         else web.loadUrl(START);
+    }
+
+    /**
+     * The world coastline file is read a piece at a time (an HTTP range):
+     * answer with just those bytes, straight from the APK (stored uncompressed).
+     */
+    private WebResourceResponse pieceOf(String asset, Map<String, String> headers) {
+        try {
+            AssetFileDescriptor fd = getAssets().openFd(asset);
+            long total = fd.getLength();
+            long start = 0, end = total - 1;
+            String range = null;
+            for (Map.Entry<String, String> h : headers.entrySet()) {
+                if ("range".equalsIgnoreCase(h.getKey())) range = h.getValue();
+            }
+            if (range != null && range.startsWith("bytes=")) {
+                String[] se = range.substring(6).split("-", 2);
+                start = Long.parseLong(se[0].trim());
+                if (se.length > 1 && !se[1].trim().isEmpty()) end = Math.min(Long.parseLong(se[1].trim()), total - 1);
+            }
+            final long length = end - start + 1;
+            FileInputStream in = fd.createInputStream();
+            long toSkip = start;
+            while (toSkip > 0) {
+                long skipped = in.skip(toSkip);
+                if (skipped <= 0) break;
+                toSkip -= skipped;
+            }
+            InputStream body = new FilterInputStream(in) {
+                long left = length;
+                @Override public int read() throws IOException {
+                    if (left <= 0) return -1;
+                    int b = super.read();
+                    if (b >= 0) left--;
+                    return b;
+                }
+                @Override public int read(byte[] buf, int off, int len) throws IOException {
+                    if (left <= 0) return -1;
+                    int n = super.read(buf, off, (int) Math.min(len, left));
+                    if (n > 0) left -= n;
+                    return n;
+                }
+            };
+            Map<String, String> out = new HashMap<>();
+            out.put("Accept-Ranges", "bytes");
+            out.put("Content-Length", String.valueOf(length));
+            out.put("Content-Range", "bytes " + start + "-" + end + "/" + total);
+            out.put("Access-Control-Allow-Origin", "*");
+            return new WebResourceResponse("application/octet-stream", null,
+                    range != null ? 206 : 200, range != null ? "Partial Content" : "OK", out, body);
+        } catch (IOException | NumberFormatException e) {
+            return null; // not in this build: the map keeps Natural Earth's coast
+        }
     }
 
     @Override
