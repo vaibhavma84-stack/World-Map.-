@@ -36,9 +36,16 @@ export const KINDS = {
 };
 const TYPES = Object.keys(KINDS).join('|');
 
+// The servers are free and often busy: stop asking after this long, write
+// what came, and keep the previous run's finds for the boxes not reached.
+const TIME_LIMIT = 140 * 60000;
+const started = Date.now();
+const late = () => Date.now() - started > TIME_LIMIT;
+
 async function overpass(query) {
   for (let attempt = 0; attempt < 3; attempt++) {
     for (const url of SERVERS) {
+      if (late()) return null;
       const ctl = new AbortController();
       const timer = setTimeout(() => ctl.abort(), 240000);
       try {
@@ -94,11 +101,18 @@ export function features(elements) {
   return out;
 }
 
-// The world in boxes of 30° by 30°, small enough for the servers.
+// The world in boxes of 30° by 30°, small enough for the servers; the
+// busiest waters first (Gulf and Hormuz, Red Sea, Malacca, Europe, East
+// Asia, the US coasts), the empty polar boxes last.
+const FIRST = [[0, 30], [0, 90], [30, 0], [30, -30], [0, 120], [30, 120], [0, 60], [30, 30], [0, -90], [30, -90], [30, -120], [30, -60], [0, 0], [-30, 0], [-30, 120], [-30, 30]];
 function boxes() {
   const list = [];
   for (let s = -90; s < 90; s += 30) for (let w = -180; w < 180; w += 30) list.push([s, w, s + 30, w + 30]);
-  return list;
+  const rank = (b) => {
+    const i = FIRST.findIndex(([s, w]) => s === b[0] && w === b[1]);
+    return i >= 0 ? i : FIRST.length + Math.abs(b[0] + 15);
+  };
+  return list.sort((a, b) => rank(a) - rank(b));
 }
 const inBox = (f, [s, w, n, e]) => {
   const c = f.geometry.type === 'Polygon' ? f.geometry.coordinates[0][0] : f.geometry.coordinates[0];

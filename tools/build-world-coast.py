@@ -34,10 +34,49 @@ def source_path():
     return bc.source_path()
 
 
+def cells(shape, size):
+    """The shape cut into squares of `size` degrees: small pieces are quick
+    to test and cut against, where a whole country (Canada, Russia) is not.
+    Cut in two stages, 10° then `size`, so each cut works on little."""
+    out = []
+    x0, y0, x1, y1 = shape.bounds
+    for big in grid(shape, (x0, y0, x1, y1), 10):
+        out.extend(grid(big, big.bounds, size))
+    return out
+
+
+def grid(shape, bounds, size):
+    import math
+    x0, y0, x1, y1 = bounds
+    out = []
+    for i in range(math.floor(x0 / size), math.ceil(x1 / size)):
+        for j in range(math.floor(y0 / size), math.ceil(y1 / size)):
+            part = shapely.clip_by_rect(shape, i * size, j * size, (i + 1) * size, (j + 1) * size)
+            if not part.is_empty and part.area > 0:
+                out.append(shapely.make_valid(part))
+    return out
+
+
+def overlay(op, a, b):
+    """An overlay that survives GEOS's occasional robustness failures: retry
+    on a fine grid, and give up on the piece (None) if that fails too."""
+    try:
+        return op(a, b)
+    except shapely.errors.GEOSException:
+        try:
+            return op(shapely.make_valid(a), shapely.make_valid(b), grid_size=1e-7)
+        except shapely.errors.GEOSException:
+            return None
+
+
 def main():
     countries = json.load(open(os.path.join(ROOT, 'data', 'countries.json')))
-    shapes = [shapely.make_valid(shapely.geometry.shape(f['geometry'])) for f in countries['features']]
-    colours = [f['properties']['c'] for f in countries['features']]
+    shapes, colours = [], []
+    for f in countries['features']:
+        for part in cells(shapely.make_valid(shapely.geometry.shape(f['geometry'])), 1):
+            shapes.append(part)
+            colours.append(f['properties']['c'])
+    print(f'{len(shapes):,} country squares', file=sys.stderr, flush=True)
     tree = shapely.STRtree(shapes)
     for s in shapes:
         shapely.prepare(s)
@@ -61,16 +100,26 @@ def main():
         hits = tree.query(piece, predicate='intersects')
         if len(hits) == 1 and shapely.contains(shapes[hits[0]], piece):
             emit(piece, colours[hits[0]])
-        else:
-            rest = piece
-            for i in hits:
-                part = shapely.intersection(piece, shapes[i])
-                if not part.is_empty:
-                    emit(part, colours[i])
-                    rest = shapely.difference(rest, shapes[i])
-            if not rest.is_empty:
-                nearest = tree.nearest(rest)
-                emit(rest, colours[nearest])
+            continue
+        # One area per colour (the squares of a colour joined first), so the
+        # land is not cut along the squares' edges.
+        by_colour = {}
+        for i in hits:
+            by_colour.setdefault(colours[i], []).append(shapes[i])
+        joined = {c: shapely.union_all(parts) if len(parts) > 1 else parts[0] for c, parts in by_colour.items()}
+        if len(joined) == 1:
+            (c, area), = joined.items()
+            if shapely.covers(area, piece):
+                emit(piece, c)
+                continue
+        rest = piece
+        for c, area in joined.items():
+            part = overlay(shapely.intersection, piece, area)
+            if part is not None and not part.is_empty:
+                emit(part, c)
+                rest = overlay(shapely.difference, rest, area) if rest is not None else None
+        if rest is not None and not rest.is_empty and rest.area > 0:
+            emit(rest, colours[tree.nearest(rest)])
         if n % 50000 == 0:
             print(f'  {n:,}', file=sys.stderr, flush=True)
 
