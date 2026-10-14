@@ -15,7 +15,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 
 const root = new URL('..', import.meta.url);
-const UA = { 'User-Agent': 'world-map-terminals/1 (github.com/vaibhavma84-stack/World-Map.-)' };
+const UA = { 'User-Agent': 'WorldMapTerminals/1.0 (https://github.com/vaibhavma84-stack/World-Map.-; personal seafarer map) node-fetch' };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const GAS = /\b(LNG|LPG)\b|liquefied\s+(natural|petroleum)\s+gas|regasification|liquefaction/i;
 const kindOf = (text) => {
@@ -33,20 +33,52 @@ const WD = 'https://www.wikidata.org/w/api.php';
 const PLACE = /terminal|plant|facility|regasification|liquefaction|import|export|storage|jetty|port|harbou?r|FSRU|floating storage/i;
 const NOT_PLACE = /ship|vessel|carrier|tanker|company|corporation|business|article|scholarly|journal|patent|project company|family name|given name/i;
 
+// Wikidata turns away requests that come too fast; go gently, retry, and say
+// what it answered when it refuses.
+async function wdJson(params) {
+  const url = `${WD}?${new URLSearchParams({ format: 'json', maxlag: '5', ...params })}`;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      const res = await fetch(url, { headers: { ...UA, Accept: 'application/json' } });
+      const text = await res.text();
+      try { return JSON.parse(text); } catch { throw new Error(`${res.status} ${text.slice(0, 160).replace(/\s+/g, ' ')}`); }
+    } catch (e) {
+      console.warn(`  Wikidata: ${e.message}`);
+      await sleep(5000 * 3 ** attempt);
+    }
+  }
+  return null;
+}
+
+async function entities(ids, props) {
+  const j = await wdJson({ action: 'wbgetentities', props, languages: 'en', ids: ids.join('|') });
+  if (j?.entities) return Object.values(j.entities);
+  // One at a time, from the plain data pages, if the batch is refused.
+  const out = [];
+  for (const id of ids) {
+    try {
+      const r = await fetch(`https://www.wikidata.org/wiki/Special:EntityData/${id}.json`, { headers: UA });
+      const d = await r.json();
+      out.push(...Object.values(d.entities || {}));
+    } catch (e) { console.warn(`  ${id}: ${e.message}`); }
+    await sleep(1000);
+  }
+  return out;
+}
+
 async function wikidata() {
   const terms = ['LNG terminal', 'LNG', 'LNG import terminal', 'LNG export terminal', 'liquefied natural gas',
     'regasification terminal', 'FSRU', 'LPG terminal', 'liquefied petroleum gas terminal', 'LPG import terminal'];
   const ids = new Set();
   for (const term of terms) {
     for (let offset = 0; offset < 1500; offset += 500) {
-      const url = `${WD}?action=query&list=search&format=json&srlimit=500&sroffset=${offset}&srsearch=${encodeURIComponent(`${term} haswbstatement:P625`)}`;
       try {
-        const j = await (await fetch(url, { headers: UA })).json();
-        const hits = j.query?.search || [];
+        const j = await wdJson({ action: 'query', list: 'search', srlimit: '500', sroffset: String(offset), srsearch: `${term} haswbstatement:P625` });
+        const hits = j?.query?.search || [];
         for (const h of hits) ids.add(h.title);
         if (hits.length < 500) break;
       } catch (e) { console.warn(`  search "${term}": ${e.message}`); break; }
-      await sleep(500);
+      await sleep(1500);
     }
   }
   console.log(`  ${ids.size} candidate items`);
@@ -54,10 +86,7 @@ async function wikidata() {
   const out = [];
   const operators = new Map();
   for (let i = 0; i < list.length; i += 50) {
-    const url = `${WD}?action=wbgetentities&format=json&props=labels|descriptions|claims&languages=en&ids=${list.slice(i, i + 50).join('|')}`;
-    let j;
-    try { j = await (await fetch(url, { headers: UA })).json(); } catch (e) { console.warn(`  entities: ${e.message}`); continue; }
-    for (const e of Object.values(j.entities || {})) {
+    for (const e of await entities(list.slice(i, i + 50), 'labels|descriptions|claims')) {
       const name = e.labels?.en?.value || '';
       const desc = e.descriptions?.en?.value || '';
       const text = `${name} ${desc}`;
@@ -68,15 +97,13 @@ async function wikidata() {
       out.push({ lon: coord.longitude, lat: coord.latitude, name, kind: kindOf(text) || 'LNG', operator: op, source: 'Wikidata', desc });
       if (op) operators.set(op, '');
     }
-    await sleep(300);
+    await sleep(1500);
   }
   // Operators' names.
   const opIds = [...operators.keys()];
   for (let i = 0; i < opIds.length; i += 50) {
-    try {
-      const j = await (await fetch(`${WD}?action=wbgetentities&format=json&props=labels&languages=en&ids=${opIds.slice(i, i + 50).join('|')}`, { headers: UA })).json();
-      for (const e of Object.values(j.entities || {})) operators.set(e.id, e.labels?.en?.value || '');
-    } catch { /* names only */ }
+    for (const e of await entities(opIds.slice(i, i + 50), 'labels')) operators.set(e.id, e.labels?.en?.value || '');
+    await sleep(1500);
   }
   for (const t of out) t.operator = operators.get(t.operator) || '';
   return out;
@@ -93,7 +120,7 @@ const NOT_TERMINALS = ['amenity', 'shop', 'highway', 'railway', 'public_transpor
 // The Overpass servers are free and often busy, so: the biggest ports first,
 // a time limit for the whole run, and whatever a run could not ask about is
 // kept from the previous run and tried again next time.
-const TIME_LIMIT = 75 * 60000;
+const TIME_LIMIT = 20 * 60000;
 const started = Date.now();
 
 async function overpass(query) {
