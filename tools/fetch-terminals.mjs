@@ -91,6 +91,11 @@ async function wikidata() {
       const desc = e.descriptions?.en?.value || '';
       const text = `${name} ${desc}`;
       if (!name || !GAS.test(text) || !PLACE.test(text) || NOT_PLACE.test(desc)) continue;
+      // Gas-fired power stations are not terminals; nor is anything proposed,
+      // cancelled, closed or no longer standing (P576: dissolved/demolished).
+      if (/power (plant|station)|combined cycle|generating station/i.test(text)) continue;
+      if (/proposed|planned|cancel|former|defunct|decommission|abandon|closed/i.test(desc)) continue;
+      if (e.claims?.P576) continue;
       const coord = e.claims?.P625?.[0]?.mainsnak?.datavalue?.value;
       if (!coord) continue;
       const op = e.claims?.P137?.[0]?.mainsnak?.datavalue?.value?.id || '';
@@ -120,7 +125,7 @@ const NOT_TERMINALS = ['amenity', 'shop', 'highway', 'railway', 'public_transpor
 // The Overpass servers are free and often busy, so: the biggest ports first,
 // a time limit for the whole run, and whatever a run could not ask about is
 // kept from the previous run and tried again next time.
-const TIME_LIMIT = 20 * 60000;
+const TIME_LIMIT = 10 * 60000;
 const started = Date.now();
 
 async function overpass(query) {
