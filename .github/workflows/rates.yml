@@ -13,6 +13,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: rates
@@ -36,3 +37,13 @@ jobs:
           git commit -m "Update exchange rates"
           git pull --rebase
           git push
+
+      # Builds started by this job's own push would not run on their own, so
+      # start the Android and iPhone builds here once there is new data.
+      - name: Rebuild the apps
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [ "$(git rev-parse HEAD)" = "${{ github.sha }}" ] && exit 0
+          gh workflow run android.yml --ref "${{ github.ref_name }}"
+          gh workflow run pages.yml --ref "${{ github.ref_name }}"

@@ -7,13 +7,10 @@ name: Port coastlines
 # in the repository's history, so this runs only when asked.
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - 'tools/build-coast.py'
-      - '.github/workflows/coast.yml'
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: coast
@@ -53,3 +50,13 @@ jobs:
           git commit -q -m "Update harbour coastlines from OpenStreetMap"
           git pull --rebase -q
           git push
+
+      # Builds started by this job's own push would not run on their own, so
+      # start the Android and iPhone builds here once there is new data.
+      - name: Rebuild the apps
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [ "$(git rev-parse HEAD)" = "${{ github.sha }}" ] && exit 0
+          gh workflow run android.yml --ref "${{ github.ref_name }}"
+          gh workflow run pages.yml --ref "${{ github.ref_name }}"
