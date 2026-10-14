@@ -24,7 +24,7 @@ self.addEventListener('install', (e) => {
 self.addEventListener('activate', (e) => {
   e.waitUntil(caches.keys()
     
-    .then((keys) => Promise.all(keys.filter((k) => k !== VERSION && k !== TILES && k !== COAST).map((k) => caches.delete(k))))
+    .then((keys) => Promise.all(keys.filter((k) => k !== VERSION && k !== TILES && k !== COAST && k !== OFM).map((k) => caches.delete(k))))
     .then(() => self.clients.claim()));
 });
 
@@ -57,8 +57,37 @@ async function coastSquare(request) {
   return res;
 }
 
+// OpenFreeMap's vector tiles (detailed water): kept once seen, so a river or
+// harbour looked at with a connection is still detailed at sea. The tile set's
+// description is fetched fresh when possible, as it names the current tiles.
+const OFM = 'wm-ofm';
+const OFM_LIMIT = 20000;
+async function ofmTile(request) {
+  const cache = await caches.open(OFM);
+  const isIndex = !new URL(request.url).pathname.endsWith('.pbf');
+  if (isIndex) {
+    try {
+      const res = await fetch(request);
+      if (res.ok) await cache.put(request, res.clone());
+      return res;
+    } catch {
+      return (await cache.match(request)) || Response.error();
+    }
+  }
+  const hit = await cache.match(request);
+  if (hit) return hit;
+  const res = await fetch(request);
+  if (res.ok) {
+    await cache.put(request, res.clone());
+    const keys = await cache.keys();
+    for (const k of keys.slice(0, Math.max(0, keys.length - OFM_LIMIT))) await cache.delete(k);
+  }
+  return res;
+}
+
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;
+  if (new URL(e.request.url).host === 'tiles.openfreemap.org') { e.respondWith(ofmTile(e.request)); return; }
   const url = new URL(e.request.url);
   if (url.origin === location.origin && url.pathname.includes('/data/coast/') && !url.pathname.endsWith('index.json')) {
     e.respondWith(coastSquare(e.request));

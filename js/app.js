@@ -328,10 +328,11 @@ map.on('load', loadCoast);
 const LAYER_GROUPS = {
   seamarks: ['seamarks'],
   currents: ['currents-line', 'currents-arrows', 'currents-names'],
+  osmwater: ['osm-water', 'osm-water-edge', 'osm-waterway'],
   rivers: ['rivers-0', 'rivers-6', 'rivers-9', 'river-names-0', 'river-names-5', 'river-names-9', 'lakes', 'lake-names'],
   grid: ['grid'],
 };
-const shown = { seamarks: true, currents: true, rivers: true, grid: true, weather: false, ...store.get('layers', {}) };
+const shown = { seamarks: true, osmwater: true, currents: true, rivers: true, grid: true, weather: false, ...store.get('layers', {}) };
 let wx = null;
 function applyLayers() {
   for (const [group, ids] of Object.entries(LAYER_GROUPS)) {
@@ -370,7 +371,34 @@ function addCurrents() {
   }, before);
 }
 
+// OpenStreetMap's water everywhere (rivers, channels, docks, lakes, sea) from
+// OpenFreeMap's vector tiles: online, and kept on the phone once seen. Added
+// only once the map has loaded, so at sea with no connection it cannot hold
+// the map up.
+function addOsmWater() {
+  map.addSource('osm', { type: 'vector', url: 'https://tiles.openfreemap.org/planet' });
+  for (const layer of OSM_WATER_LAYERS) map.addLayer(layer, 'rivers-0');
+}
+const OSM_WATER_LAYERS = [
+  {
+    id: 'osm-water', type: 'fill', source: 'osm', 'source-layer': 'water', minzoom: 8,
+    paint: { 'fill-color': SEA, 'fill-antialias': true },
+  },
+  {
+    id: 'osm-water-edge', type: 'line', source: 'osm', 'source-layer': 'water', minzoom: 9,
+    filter: ['!=', ['get', 'class'], 'ocean'],
+    paint: { 'line-color': '#6f97b3', 'line-width': zoomed([[9, 0.4], [14, 1]]) },
+  },
+  {
+    id: 'osm-waterway', type: 'line', source: 'osm', 'source-layer': 'waterway', minzoom: 9,
+    filter: ['match', ['get', 'class'], ['river', 'canal'], true, false],
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': '#5b9bd0', 'line-width': zoomed([[9, 0.8], [14, 2.5]]) },
+  },
+];
+
 map.on('load', () => {
+  addOsmWater();
   addCurrents();
   wx = setupWeather(map, {
     bar: $('#wx-bar'), slider: $('#wx-slider'), time: $('#wx-time'), status: $('#wx-status'),
