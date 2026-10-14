@@ -1,7 +1,7 @@
 name: Gas terminals
 
 # Gathers LNG and LPG terminals near ports from Wikidata and OpenStreetMap
-# into data/terminals.json. Runs monthly, and when its script changes.
+# into data/terminals.json. Runs monthly, or from the Actions tab when wanted.
 on:
   schedule:
     - cron: '37 5 3 * *'
