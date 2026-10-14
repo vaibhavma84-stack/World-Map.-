@@ -55,6 +55,13 @@ const gas = json('terminals');
 ok(Array.isArray(gas) && gas.every((t) => t.length === 6 && Math.abs(t[0]) <= 180 && Math.abs(t[1]) <= 90 && ['LNG', 'LPG', 'LNG/LPG'].includes(t[3])), 'terminals well-formed');
 ok(!gas.some((t) => /TEST/.test(t[2])), 'no test data in terminals');
 
+// Traffic separation schemes: either not fetched yet, or well-formed.
+const { KINDS } = await import('../tools/fetch-tss.mjs');
+const tss = json('tss');
+const tssKinds = new Set(Object.values(KINDS));
+ok(tss.type === 'FeatureCollection' && tss.features.every((f) => tssKinds.has(f.properties.k)
+  && ['LineString', 'Polygon'].includes(f.geometry.type)), 'tss well-formed');
+
 // Harbour coastlines: once built, every square listed is there.
 if (existsSync(`${root}data/coast/index.json`)) {
   const idx = json('coast/index');

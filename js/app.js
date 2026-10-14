@@ -340,17 +340,65 @@ const LAYER_GROUPS = {
   seamarks: ['seamarks'],
   currents: ['currents-line', 'currents-arrows', 'currents-names'],
   terminals: ['terminals'],
+  tss: ['tss-zone', 'tss-area-edge', 'tss-line', 'tss-lane', 'tss-track', 'tss-arrows'],
   osmwater: ['osm-water', 'osm-water-edge', 'osm-waterway'],
   rivers: ['rivers-0', 'rivers-6', 'rivers-9', 'river-names-0', 'river-names-5', 'river-names-9', 'lakes', 'lake-names'],
   grid: ['grid'],
 };
-const shown = { seamarks: true, osmwater: true, terminals: true, currents: true, rivers: true, grid: true, weather: false, ...store.get('layers', {}) };
+const shown = { tss: true, seamarks: true, osmwater: true, terminals: true, currents: true, rivers: true, grid: true, weather: false, ...store.get('layers', {}) };
 let wx = null;
 function applyLayers() {
   for (const [group, ids] of Object.entries(LAYER_GROUPS)) {
     for (const id of ids) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', shown[group] ? 'visible' : 'none');
   }
   wx?.setOn(shown.weather);
+}
+
+// Traffic separation schemes and routeing measures, from data/tss.json (kept
+// up to date by tools/fetch-tss.mjs), in chart magenta and shown offline.
+const TSS_COLOUR = '#c2189b';
+async function addTss() {
+  const data = await fetch('data/tss.json').then((r) => (r.ok ? r.json() : null)).catch(() => null);
+  if (!data?.features?.length) return;
+  map.addImage('tss-arrow', flowImage(TSS_COLOUR), { pixelRatio: 2 });
+  map.addSource('tss', { type: 'geojson', data, tolerance: 0.2 });
+  const kind = (...k) => ['in', ['get', 'k'], ['literal', k]];
+  const before = 'borders';
+  map.addLayer({
+    id: 'tss-zone', type: 'fill', source: 'tss', minzoom: 3,
+    filter: ['all', ['==', ['geometry-type'], 'Polygon'], kind('zone')],
+    paint: { 'fill-color': TSS_COLOUR, 'fill-opacity': 0.28 },
+  }, before);
+  map.addLayer({
+    id: 'tss-area-edge', type: 'line', source: 'tss', minzoom: 5,
+    filter: ['all', ['==', ['geometry-type'], 'Polygon'], kind('itz', 'precaution')],
+    paint: { 'line-color': TSS_COLOUR, 'line-width': 1.2, 'line-dasharray': [4, 3], 'line-opacity': 0.8 },
+  }, before);
+  map.addLayer({
+    id: 'tss-line', type: 'line', source: 'tss', minzoom: 3,
+    filter: ['all', ['==', ['geometry-type'], 'LineString'], kind('line', 'zone')],
+    paint: { 'line-color': TSS_COLOUR, 'line-width': zoomed([[3, 1.5], [10, 5]]), 'line-opacity': 0.45 },
+  }, before);
+  map.addLayer({
+    id: 'tss-lane', type: 'line', source: 'tss', minzoom: 5,
+    filter: kind('boundary', 'itz', 'precaution', 'crossing'),
+    paint: { 'line-color': TSS_COLOUR, 'line-width': 1.2, 'line-dasharray': [4, 3], 'line-opacity': 0.8 },
+  }, before);
+  map.addLayer({
+    id: 'tss-track', type: 'line', source: 'tss', minzoom: 4,
+    filter: kind('track', 'dw', 'twoway'),
+    paint: { 'line-color': TSS_COLOUR, 'line-width': 1.4, 'line-dasharray': [6, 3], 'line-opacity': 0.85 },
+  }, before);
+  // Arrows the way traffic goes: lanes are drawn in their direction of travel.
+  map.addLayer({
+    id: 'tss-arrows', type: 'symbol', source: 'tss', minzoom: 5,
+    filter: ['all', ['==', ['geometry-type'], 'LineString'], kind('lane', 'track', 'dw')],
+    layout: {
+      'symbol-placement': 'line', 'symbol-spacing': 110, 'icon-image': 'tss-arrow', 'icon-size': zoomed([[5, 0.5], [10, 0.8]]),
+      'icon-allow-overlap': true, 'icon-ignore-placement': true,
+    },
+  }, before);
+  applyLayers();
 }
 
 // The great ocean currents: warm in red, cold in blue, arrows the way they set.
@@ -481,6 +529,7 @@ map.on('load', () => {
   addWorldCoast();
   addOsmWater();
   addTerminals();
+  addTss();
   addCurrents();
   wx = setupWeather(map, {
     bar: $('#wx-bar'), slider: $('#wx-slider'), time: $('#wx-time'), status: $('#wx-status'),

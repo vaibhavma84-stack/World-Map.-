@@ -9,7 +9,8 @@
     "test": "node tests/data.test.mjs",
     "icons": "node tools/make-icons.mjs",
     "rates": "node tools/fetch-rates.mjs",
-    "terminals": "node tools/fetch-terminals.mjs"
+    "terminals": "node tools/fetch-terminals.mjs",
+    "tss": "node tools/fetch-tss.mjs"
   },
   "repository": {
     "type": "git",

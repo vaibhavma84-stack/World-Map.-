@@ -1,0 +1,50 @@
+name: Traffic separation schemes
+
+# Gathers traffic separation schemes, recommended tracks and other routeing
+# measures from OpenStreetMap's sea marks into data/tss.json. Runs monthly,
+# or from the Actions tab when wanted.
+on:
+  schedule:
+    - cron: '17 4 5 * *'
+  workflow_dispatch:
+  push:
+    paths:
+      - tools/fetch-tss.mjs
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: tss
+  cancel-in-progress: false
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node tools/fetch-tss.mjs
+      - name: Save if changed
+        run: |
+          git add data/tss.json
+          git diff --cached --quiet && exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Update traffic separation schemes"
+          git pull --rebase -q
+          git push
+
+      # Builds started by this job's own push would not run on their own, so
+      # start the Android and iPhone builds here once there is new data.
+      - name: Rebuild the apps
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [ "$(git rev-parse HEAD)" = "${{ github.sha }}" ] && exit 0
+          gh workflow run android.yml --ref "${{ github.ref_name }}"
+          gh workflow run pages.yml --ref "${{ github.ref_name }}"
