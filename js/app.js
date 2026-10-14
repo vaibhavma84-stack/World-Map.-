@@ -40,6 +40,11 @@ const load = (f) => fetch(`data/${f}.json`).then((r) => {
 const [countries, borders, labels, rivers, riverNames, lakes, portRows] = await Promise.all(
   ['countries', 'borders', 'labels', 'rivers', 'river-names', 'lakes', 'ports'].map(load),
 );
+// LNG and LPG terminals, gathered by a job on GitHub from Wikidata and
+// OpenStreetMap: [lon, lat, name, kind, operator, source].
+const terminalRows = await fetch('data/terminals.json').then((r) => (r.ok ? r.json() : [])).catch(() => []);
+const terminals = terminalRows.map(([lon, lat, name, kind, operator, source], i) => ({ i, lon, lat, name, kind, operator, source }));
+
 // Exchange rates against the US dollar: the copy saved into the app by a
 // daily job on GitHub, replaced by a fresh one whenever there is a connection.
 let rates = await fetch('data/rates.json').then((r) => r.json()).catch(() => ({ date: null, rates: {} }));
@@ -270,9 +275,12 @@ map.getCanvas().addEventListener('mouseleave', () => { $('#coords').textContent 
 map.on('click', (e) => {
   const pad = 12;
   const box = [[e.point.x - pad, e.point.y - pad], [e.point.x + pad, e.point.y + pad]];
+  const gasHit = shown.terminals && map.getLayer('terminals') && map.queryRenderedFeatures(box, { layers: ['terminals'] })[0];
   const currentHit = shown.currents && map.getLayer('currents-line') && map.queryRenderedFeatures(box, { layers: ['currents-line'] })[0];
   const hits = map.queryRenderedFeatures(box, { layers: PORT_LAYERS });
-  if (!hits.length && currentHit) {
+  if (gasHit) {
+    showTerminal(terminals[gasHit.properties.i]);
+  } else if (!hits.length && currentHit) {
     showCurrent(currentHit.properties);
   } else if (hits.length) {
     const best = hits
@@ -289,7 +297,7 @@ const dist2 = (e, p) => {
   const q = map.project([p.lon, p.lat]);
   return (q.x - e.point.x) ** 2 + (q.y - e.point.y) ** 2;
 };
-for (const layer of PORT_LAYERS) {
+for (const layer of [...PORT_LAYERS, 'terminals']) {
   map.on('mouseenter', layer, () => { map.getCanvas().style.cursor = 'pointer'; });
   map.on('mouseleave', layer, () => { map.getCanvas().style.cursor = ''; });
 }
@@ -328,11 +336,12 @@ map.on('load', loadCoast);
 const LAYER_GROUPS = {
   seamarks: ['seamarks'],
   currents: ['currents-line', 'currents-arrows', 'currents-names'],
+  terminals: ['terminals'],
   osmwater: ['osm-water', 'osm-water-edge', 'osm-waterway'],
   rivers: ['rivers-0', 'rivers-6', 'rivers-9', 'river-names-0', 'river-names-5', 'river-names-9', 'lakes', 'lake-names'],
   grid: ['grid'],
 };
-const shown = { seamarks: true, osmwater: true, currents: true, rivers: true, grid: true, weather: false, ...store.get('layers', {}) };
+const shown = { seamarks: true, osmwater: true, terminals: true, currents: true, rivers: true, grid: true, weather: false, ...store.get('layers', {}) };
 let wx = null;
 function applyLayers() {
   for (const [group, ids] of Object.entries(LAYER_GROUPS)) {
@@ -397,8 +406,48 @@ const OSM_WATER_LAYERS = [
   },
 ];
 
+// Gas terminals: a badge saying LNG or LPG, the name once zoomed in.
+const TERMINAL_COLOUR = { LNG: '#e07a1f', LPG: '#2a9d5b', 'LNG/LPG': '#8a5cc2' };
+function badge(text, colour) {
+  const s = 2, w = (text.length * 8 + 10) * s, h = 18 * s;
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const g = c.getContext('2d');
+  g.fillStyle = colour;
+  g.strokeStyle = '#ffffff';
+  g.lineWidth = 2 * s;
+  g.beginPath();
+  g.roundRect(s, s, w - 2 * s, h - 2 * s, 5 * s);
+  g.fill(); g.stroke();
+  g.fillStyle = '#ffffff';
+  g.font = `bold ${11 * s}px -apple-system, Roboto, sans-serif`;
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText(text, w / 2, h / 2 + s / 2);
+  return g.getImageData(0, 0, w, h);
+}
+function addTerminals() {
+  for (const [kind, colour] of Object.entries(TERMINAL_COLOUR)) map.addImage(`gas-${kind}`, badge(kind, colour), { pixelRatio: 2 });
+  map.addSource('terminals', {
+    type: 'geojson',
+    data: {
+      type: 'FeatureCollection',
+      features: terminals.map((t) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [t.lon, t.lat] }, properties: { i: t.i, kind: t.kind, name: t.name } })),
+    },
+  });
+  map.addLayer({
+    id: 'terminals', type: 'symbol', source: 'terminals', minzoom: 6,
+    layout: {
+      'icon-image': ['concat', 'gas-', ['get', 'kind']], 'icon-allow-overlap': true, 'icon-size': zoomed([[6, 0.8], [10, 1]]),
+      'text-field': ['step', ['zoom'], '', 10, ['get', 'name']], 'text-font': ['OpenSans-Semibold'], 'text-size': 11,
+      'text-anchor': 'top', 'text-offset': [0, 1.1], 'text-max-width': 10, 'text-optional': true,
+    },
+    paint: { 'text-color': '#5a3a12', ...halo },
+  }, 'picked');
+}
+
 map.on('load', () => {
   addOsmWater();
+  addTerminals();
   addCurrents();
   wx = setupWeather(map, {
     bar: $('#wx-bar'), slider: $('#wx-slider'), time: $('#wx-time'), status: $('#wx-status'),
@@ -650,6 +699,7 @@ function showPort(p) {
         <div class="note">Enter the ETA in port time.</div>
         <dl id="eta-out"></dl>
       </div>
+      ${gasCard(p)}
       <div class="card tide" id="c-tide"><h3>Tide</h3><div class="note">Loading…</div></div>
       <div id="c-facts"></div>
     </div>
@@ -668,6 +718,55 @@ function showPort(p) {
   if (p.detail >= 0) {
     loadDetails().then((all) => { if (current === p) $('#c-facts').innerHTML = facts(all[p.detail]); });
   }
+}
+
+// Great-circle distance in nautical miles, and the initial true bearing.
+function legFrom(a, b) {
+  const r = Math.PI / 180;
+  const [f1, f2, dl] = [a.lat * r, b.lat * r, (b.lon - a.lon) * r];
+  const h = Math.sin((f2 - f1) / 2) ** 2 + Math.cos(f1) * Math.cos(f2) * Math.sin(dl / 2) ** 2;
+  const nm = 2 * 3440.065 * Math.asin(Math.min(1, Math.sqrt(h)));
+  const y = Math.sin(dl) * Math.cos(f2);
+  const x = Math.cos(f1) * Math.sin(f2) - Math.sin(f1) * Math.cos(f2) * Math.cos(dl);
+  return { nm, brg: ((Math.atan2(y, x) / r) + 360) % 360 };
+}
+
+function gasNear(p, maxNm = 15) {
+  return terminals
+    .filter((t) => Math.abs(t.lat - p.lat) < 0.5 && Math.abs(t.lon - p.lon) < 0.8)
+    .map((t) => ({ t, ...legFrom(p, t) }))
+    .filter((x) => x.nm <= maxNm)
+    .sort((a, b) => a.nm - b.nm);
+}
+
+function gasCard(p) {
+  const near = gasNear(p);
+  if (!near.length) return '';
+  return `<div class="card"><h3>Gas terminals nearby</h3><ul class="gas">${near.slice(0, 8).map(({ t, nm }) => `
+    <li><button type="button" data-gas="${t.i}">
+      <span class="tag" style="background:${TERMINAL_COLOUR[t.kind]}">${esc(t.kind)}</span>
+      <span class="gname">${esc(t.name)}</span>
+      <span class="note">${nm.toFixed(1)} nm${t.operator ? ` · ${esc(t.operator)}` : ''}</span>
+    </button></li>`).join('')}</ul></div>`;
+}
+
+function showTerminal(t) {
+  clearInterval(ticker);
+  current = null;
+  map.getSource('picked').setData({ type: 'Feature', geometry: { type: 'Point', coordinates: [t.lon, t.lat] }, properties: {} });
+  const nearest = ports
+    .filter((p) => Math.abs(p.lat - t.lat) < 0.5 && Math.abs(p.lon - t.lon) < 0.8)
+    .map((p) => ({ p, ...legFrom(t, p) }))
+    .sort((a, b) => a.nm - b.nm)[0];
+  const rows = [['Type', t.kind], ['Operator', t.operator], ['Position', position(t.lat, t.lon)],
+    ['Nearest port', nearest ? `${nearest.p.name} · ${nearest.nm.toFixed(1)} nm` : '']].filter(([, v]) => v);
+  openPanel(`
+    <h1>${esc(t.name)}</h1>
+    <p class="sub"><span class="tag" style="background:${TERMINAL_COLOUR[t.kind]}">${esc(t.kind)}</span> terminal</p>
+    <div class="cards"><div class="card"><table class="facts">${rows.map(([k, v]) => `<tr><th>${esc(k)}</th><td>${esc(v)}</td></tr>`).join('')}</table></div>
+      ${nearest ? `<button type="button" class="card linkish" data-port="${nearest.p.i}">Open ${esc(nearest.p.name)} →</button>` : ''}
+    </div>
+    <p class="source">From ${esc(t.source)}${t.source === 'OpenStreetMap' ? ' (© OpenStreetMap contributors)' : ''}. Not for navigation.</p>`);
 }
 
 function showCurrent(c) {
@@ -838,6 +937,14 @@ function openSettings() {
 $('#settings-btn').onclick = openSettings;
 body.addEventListener('click', (e) => {
   if (e.target.closest('[data-settings]')) { e.preventDefault(); openSettings(); }
+  const gb = e.target.closest('[data-gas]');
+  if (gb) {
+    const t = terminals[+gb.dataset.gas];
+    showTerminal(t);
+    map.flyTo({ center: [t.lon, t.lat], zoom: Math.max(map.getZoom(), 12), padding: clearOfPanel() });
+  }
+  const pp = e.target.closest('[data-port]');
+  if (pp) choose(ports[+pp.dataset.port]);
   const cb = e.target.closest('[data-country]');
   if (cb) openCountry(cb.dataset.country);
 });

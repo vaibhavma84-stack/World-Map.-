@@ -7,7 +7,7 @@ on:
     paths-ignore:
       - 'README.md'
   workflow_run:
-    workflows: ["Exchange rates", "Port coastlines"]
+    workflows: ["Exchange rates", "Port coastlines", "Gas terminals"]
     types: [completed]
   workflow_dispatch:
 

@@ -50,6 +50,11 @@ ok(unknown.length === 0, `countries without currency: ${unknown}`);
 const details = json('details');
 ok(ports.filter((p) => p[7] >= 0).every((p) => details[p[7]]), 'every World Port Index port has particulars');
 
+// Gas terminals: either not fetched yet, or well-formed.
+const gas = json('terminals');
+ok(Array.isArray(gas) && gas.every((t) => t.length === 6 && Math.abs(t[0]) <= 180 && Math.abs(t[1]) <= 90 && ['LNG', 'LPG', 'LNG/LPG'].includes(t[3])), 'terminals well-formed');
+ok(!gas.some((t) => /TEST/.test(t[2])), 'no test data in terminals');
+
 // Harbour coastlines: once built, every square listed is there.
 if (existsSync(`${root}data/coast/index.json`)) {
   const idx = json('coast/index');

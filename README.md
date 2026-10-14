@@ -37,6 +37,8 @@ connection once it is installed.
   The last download stays on the phone for use at sea.
 - **Tides** on each port's card: a sea-level curve with high and low waters
   (Open-Meteo model, not official tide tables).
+- **LNG and LPG terminals** marked on the map and listed on each port's card
+  (from Wikidata and OpenStreetMap; refreshed monthly).
 - **Major ocean currents** with their usual rates, always shown, offline.
 - **Sea chart marks** (online, from OpenSeaMap): TSS, recommended tracks,
   lights, buoys and beacons. Tiles you have viewed are kept for offline use.
@@ -66,6 +68,7 @@ save the map for offline use.
 | Time zones of ports | [geo-tz](https://github.com/evansiroky/node-geo-tz) | MIT / ODbL |
 | Weather, sea state, tides | [Open-Meteo](https://open-meteo.com) | CC BY 4.0 |
 | Chart marks | [OpenSeaMap](https://openseamap.org) | CC BY-SA |
+| LNG and LPG terminals | [Wikidata](https://www.wikidata.org) (CC0), OpenStreetMap (ODbL) | |
 | Exchange rates | [ExchangeRate-API](https://www.exchangerate-api.com) | Free, with attribution |
 
 ## Building

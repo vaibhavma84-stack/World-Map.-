@@ -1,0 +1,39 @@
+name: Gas terminals
+
+# Gathers LNG and LPG terminals near ports from Wikidata and OpenStreetMap
+# into data/terminals.json. Runs monthly, and when its script changes.
+on:
+  schedule:
+    - cron: '37 5 3 * *'
+  push:
+    paths:
+      - 'tools/fetch-terminals.mjs'
+      - '.github/workflows/terminals.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: terminals
+  cancel-in-progress: false
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node tools/fetch-terminals.mjs
+      - name: Save if changed
+        run: |
+          git add data/terminals.json
+          git diff --cached --quiet && exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Update LNG and LPG terminals"
+          git pull --rebase -q
+          git push

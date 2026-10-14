@@ -10,7 +10,7 @@ on:
   # A commit made by the rates or coastline job does not start other workflows by itself,
   # so listen for that job finishing.
   workflow_run:
-    workflows: ["Exchange rates", "Port coastlines"]
+    workflows: ["Exchange rates", "Port coastlines", "Gas terminals"]
     types: [completed]
   workflow_dispatch:
 
