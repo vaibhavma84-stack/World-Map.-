@@ -1,4 +1,4 @@
-"""The whole world's coastline in detail: OpenStreetMap's land polygons, each
+"""The whole world's coastline in detail (every coast, port or not): OpenStreetMap's land polygons, each
 piece coloured like its country, for tippecanoe to turn into one map file.
 
     python3 tools/build-world-coast.py > land.geojsonl

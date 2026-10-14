@@ -6,6 +6,9 @@ name: World coastline
 # builds fetch it from there. The coast changes slowly: run when wanted.
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - 'tools/build-world-coast.py'
 
 permissions:
   contents: write
