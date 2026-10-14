@@ -6,8 +6,9 @@
 //   Wikidata (CC0): items that are LNG or LPG terminals, with position and
 //     operator.
 //   OpenStreetMap (ODbL), via Overpass: anything named LNG, LPG or
-//     "liquefied … gas" within 15 km of a World Port Index port, leaving out
-//     filling stations, shops and the like.
+//     "liquefied … gas" within 12 km of large and medium ports and those
+//     listed with an LNG terminal, leaving out filling stations, shops and
+//     the like.
 // Runs on GitHub (see .github/workflows/terminals.yml), which can reach both.
 // Coverage is what those projects hold: good for large terminals, patchy for
 // small LPG jetties.
@@ -25,43 +26,60 @@ const kindOf = (text) => {
 };
 
 // ---------------------------------------------------------------- Wikidata
+// Text search for items with a position (haswbstatement:P625), then the
+// items themselves: kept when their name or description says LNG or LPG and
+// that they are a terminal, plant or facility (not a ship, firm or article).
+const WD = 'https://www.wikidata.org/w/api.php';
+const PLACE = /terminal|plant|facility|regasification|liquefaction|import|export|storage|jetty|port|harbou?r|FSRU|floating storage/i;
+const NOT_PLACE = /ship|vessel|carrier|tanker|company|corporation|business|article|scholarly|journal|patent|project company|family name|given name/i;
+
 async function wikidata() {
-  const terms = ['LNG terminal', 'liquefied natural gas terminal', 'LNG import terminal', 'LNG export terminal',
-    'regasification terminal', 'LNG plant', 'liquefied natural gas plant', 'LPG terminal', 'liquefied petroleum gas terminal'];
-  const classes = new Set();
+  const terms = ['LNG terminal', 'LNG', 'LNG import terminal', 'LNG export terminal', 'liquefied natural gas',
+    'regasification terminal', 'FSRU', 'LPG terminal', 'liquefied petroleum gas terminal', 'LPG import terminal'];
+  const ids = new Set();
   for (const term of terms) {
-    const url = `https://www.wikidata.org/w/api.php?action=wbsearchentities&format=json&language=en&type=item&limit=7&search=${encodeURIComponent(term)}`;
-    try {
-      const j = await (await fetch(url, { headers: UA })).json();
-      for (const hit of j.search || []) {
-        if (GAS.test(hit.label || '') && !/company|ship|carrier|vessel|tanker|project$/i.test(hit.description || '')) {
-          classes.add(hit.id);
-          console.log(`  class ${hit.id} ${hit.label} — ${hit.description || ''}`);
-        }
-      }
-    } catch (e) { console.warn(`  search "${term}": ${e.message}`); }
+    for (let offset = 0; offset < 1500; offset += 500) {
+      const url = `${WD}?action=query&list=search&format=json&srlimit=500&sroffset=${offset}&srsearch=${encodeURIComponent(`${term} haswbstatement:P625`)}`;
+      try {
+        const j = await (await fetch(url, { headers: UA })).json();
+        const hits = j.query?.search || [];
+        for (const h of hits) ids.add(h.title);
+        if (hits.length < 500) break;
+      } catch (e) { console.warn(`  search "${term}": ${e.message}`); break; }
+      await sleep(500);
+    }
+  }
+  console.log(`  ${ids.size} candidate items`);
+  const list = [...ids];
+  const out = [];
+  const operators = new Map();
+  for (let i = 0; i < list.length; i += 50) {
+    const url = `${WD}?action=wbgetentities&format=json&props=labels|descriptions|claims&languages=en&ids=${list.slice(i, i + 50).join('|')}`;
+    let j;
+    try { j = await (await fetch(url, { headers: UA })).json(); } catch (e) { console.warn(`  entities: ${e.message}`); continue; }
+    for (const e of Object.values(j.entities || {})) {
+      const name = e.labels?.en?.value || '';
+      const desc = e.descriptions?.en?.value || '';
+      const text = `${name} ${desc}`;
+      if (!name || !GAS.test(text) || !PLACE.test(text) || NOT_PLACE.test(desc)) continue;
+      const coord = e.claims?.P625?.[0]?.mainsnak?.datavalue?.value;
+      if (!coord) continue;
+      const op = e.claims?.P137?.[0]?.mainsnak?.datavalue?.value?.id || '';
+      out.push({ lon: coord.longitude, lat: coord.latitude, name, kind: kindOf(text) || 'LNG', operator: op, source: 'Wikidata', desc });
+      if (op) operators.set(op, '');
+    }
     await sleep(300);
   }
-  if (!classes.size) return [];
-  const query = `SELECT ?item ?itemLabel ?coord ?opLabel ?clsLabel WHERE {
-    VALUES ?cls { ${[...classes].map((q) => `wd:${q}`).join(' ')} }
-    ?item wdt:P31/wdt:P279* ?cls ; wdt:P625 ?coord .
-    OPTIONAL { ?item wdt:P137 ?op }
-    SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
-  }`;
-  const res = await fetch(`https://query.wikidata.org/sparql?format=json&query=${encodeURIComponent(query)}`, { headers: { ...UA, Accept: 'application/sparql-results+json' } });
-  if (!res.ok) throw new Error(`Wikidata ${res.status}`);
-  const rows = (await res.json()).results.bindings;
-  const out = new Map();
-  for (const r of rows) {
-    const m = r.coord.value.match(/Point\(([-\d.]+) ([-\d.]+)\)/);
-    if (!m) continue;
-    const name = r.itemLabel?.value || '';
-    if (/^Q\d+$/.test(name)) continue; // no English name
-    const kind = kindOf(`${name} ${r.clsLabel?.value || ''}`) || 'LNG';
-    out.set(r.item.value, { lon: +m[1], lat: +m[2], name, kind, operator: r.opLabel?.value || '', source: 'Wikidata' });
+  // Operators' names.
+  const opIds = [...operators.keys()];
+  for (let i = 0; i < opIds.length; i += 50) {
+    try {
+      const j = await (await fetch(`${WD}?action=wbgetentities&format=json&props=labels&languages=en&ids=${opIds.slice(i, i + 50).join('|')}`, { headers: UA })).json();
+      for (const e of Object.values(j.entities || {})) operators.set(e.id, e.labels?.en?.value || '');
+    } catch { /* names only */ }
   }
-  return [...out.values()];
+  for (const t of out) t.operator = operators.get(t.operator) || '';
+  return out;
 }
 
 // ----------------------------------------------------------- OpenStreetMap
@@ -83,7 +101,7 @@ async function overpass(query) {
     for (const url of SERVERS) {
       if (Date.now() - started > TIME_LIMIT) return null;
       const ctl = new AbortController();
-      const timer = setTimeout(() => ctl.abort(), 200000);
+      const timer = setTimeout(() => ctl.abort(), 110000);
       try {
         const res = await fetch(url, { method: 'POST', signal: ctl.signal, headers: { ...UA, 'Content-Type': 'application/x-www-form-urlencoded' }, body: `data=${encodeURIComponent(query)}` });
         if (!res.ok) throw new Error(`${res.status}`);
@@ -103,16 +121,19 @@ async function overpass(query) {
 }
 
 async function openStreetMap() {
+  // Ports likely to have gas terminals: large and medium ones, and any the
+  // World Port Index lists with an LNG terminal. Large ports first.
+  const details = JSON.parse(readFileSync(new URL('data/details.json', root)));
   const ports = JSON.parse(readFileSync(new URL('data/ports.json', root)))
-    .filter((p) => p[7] >= 0)
-    .sort((a, b) => a[5] - b[5]); // Large ports first
+    .filter((p) => p[7] >= 0 && (p[5] <= 1 || details[p[7]][9] != null))
+    .sort((a, b) => a[5] - b[5]);
   const out = [];
   const unasked = [];
-  const BATCH = 40;
+  const BATCH = 6;
   for (let i = 0; i < ports.length; i += BATCH) {
     const batch = ports.slice(i, i + BATCH);
-    const els = Date.now() - started > TIME_LIMIT ? null : await overpass(`[out:json][timeout:180];(${batch.map((p) =>
-      `nwr(around:15000,${p[2]},${p[1]})["name"~"LNG|LPG|[Ll]iquefied"];`).join('')});out center tags;`);
+    const els = Date.now() - started > TIME_LIMIT ? null : await overpass(`[out:json][timeout:90];(${batch.map((p) =>
+      `nwr(around:12000,${p[2]},${p[1]})["name"~"LNG|LPG|[Ll]iquefied"];`).join('')});out center tags;`);
     if (!els) { unasked.push(...batch); continue; }
     for (const el of els) {
       const t = el.tags || {};
