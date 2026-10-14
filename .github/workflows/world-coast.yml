@@ -1,0 +1,65 @@
+name: World coastline
+
+# Builds the whole world's detailed coastline (OpenStreetMap land polygons,
+# coloured by country) into one map file, land.pmtiles, and attaches it to
+# the "world-coast" release. Too big to keep in the repository; the app
+# builds fetch it from there. The coast changes slowly: run when wanted.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: world-coast
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Tools
+        run: |
+          pip install shapely==2.2.0 pyogrio==0.13.0
+          sudo apt-get update -q && sudo apt-get install -y -q build-essential libsqlite3-dev zlib1g-dev
+          git clone --depth 1 --branch 2.79.0 https://github.com/felt/tippecanoe.git /tmp/tippecanoe
+          make -C /tmp/tippecanoe -j4 >/dev/null
+          sudo make -C /tmp/tippecanoe install >/dev/null
+          tippecanoe --version
+
+      - name: Colour the land by country
+        run: |
+          mkdir -p tools/.cache
+          python3 tools/build-world-coast.py > tools/.cache/land.geojsonl
+          ls -lh tools/.cache/land.geojsonl
+
+      - name: Make the map file
+        run: |
+          tippecanoe -o tools/.cache/land.pmtiles -l land -Z5 -z12 \
+            -P --no-tile-size-limit --no-feature-limit --detect-shared-borders \
+            --simplification=2 --force tools/.cache/land.geojsonl
+          ls -lh tools/.cache/land.pmtiles
+
+      - name: Attach to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view world-coast >/dev/null 2>&1 || \
+            gh release create world-coast --title "World coastline data" --target "${{ github.sha }}" \
+              --notes "Detailed coastline for the whole world (OpenStreetMap land polygons, ODbL), used by the app builds. Not an app release."
+          gh release upload world-coast tools/.cache/land.pmtiles --clobber
+
+      - name: Rebuild the apps
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run android.yml --ref "${{ github.ref_name }}"
+          gh workflow run pages.yml --ref "${{ github.ref_name }}"
