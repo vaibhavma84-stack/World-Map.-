@@ -72,36 +72,48 @@ const SERVERS = [
 ];
 const NOT_TERMINALS = ['amenity', 'shop', 'highway', 'railway', 'public_transport', 'route', 'office', 'craft', 'vending', 'healthcare', 'tourism', 'leisure'];
 
+// The Overpass servers are free and often busy, so: the biggest ports first,
+// a time limit for the whole run, and whatever a run could not ask about is
+// kept from the previous run and tried again next time.
+const TIME_LIMIT = 75 * 60000;
+const started = Date.now();
+
 async function overpass(query) {
-  for (let attempt = 0; attempt < 3; attempt++) {
+  for (let attempt = 0; attempt < 2; attempt++) {
     for (const url of SERVERS) {
+      if (Date.now() - started > TIME_LIMIT) return null;
+      const ctl = new AbortController();
+      const timer = setTimeout(() => ctl.abort(), 200000);
       try {
-        const res = await fetch(url, { method: 'POST', headers: { ...UA, 'Content-Type': 'application/x-www-form-urlencoded' }, body: `data=${encodeURIComponent(query)}` });
+        const res = await fetch(url, { method: 'POST', signal: ctl.signal, headers: { ...UA, 'Content-Type': 'application/x-www-form-urlencoded' }, body: `data=${encodeURIComponent(query)}` });
         if (!res.ok) throw new Error(`${res.status}`);
         const j = await res.json();
         if (j.remark && /error|timed out|runtime/i.test(j.remark)) throw new Error(j.remark);
         return j.elements || [];
       } catch (e) {
         console.warn(`  ${url.split('/')[2]}: ${e.message}`);
-        await sleep(5000);
+        await sleep(4000);
+      } finally {
+        clearTimeout(timer);
       }
     }
-    await sleep(30000 * (attempt + 1));
+    await sleep(20000);
   }
   return null;
 }
 
 async function openStreetMap() {
-  const ports = JSON.parse(readFileSync(new URL('data/ports.json', root))).filter((p) => p[7] >= 0);
+  const ports = JSON.parse(readFileSync(new URL('data/ports.json', root)))
+    .filter((p) => p[7] >= 0)
+    .sort((a, b) => a[5] - b[5]); // Large ports first
   const out = [];
-  let failed = 0;
-  const BATCH = 25;
+  const unasked = [];
+  const BATCH = 40;
   for (let i = 0; i < ports.length; i += BATCH) {
     const batch = ports.slice(i, i + BATCH);
-    const query = `[out:json][timeout:180];(${batch.map((p) =>
-      `nwr(around:15000,${p[2]},${p[1]})["name"~"LNG|LPG|[Ll]iquefied"];`).join('')});out center tags;`;
-    const els = await overpass(query);
-    if (!els) { failed++; continue; }
+    const els = Date.now() - started > TIME_LIMIT ? null : await overpass(`[out:json][timeout:180];(${batch.map((p) =>
+      `nwr(around:15000,${p[2]},${p[1]})["name"~"LNG|LPG|[Ll]iquefied"];`).join('')});out center tags;`);
+    if (!els) { unasked.push(...batch); continue; }
     for (const el of els) {
       const t = el.tags || {};
       if (NOT_TERMINALS.some((k) => t[k])) continue;
@@ -111,10 +123,10 @@ async function openStreetMap() {
       if (lat == null) continue;
       out.push({ lon, lat, name, kind: kindOf(name), operator: t.operator || '', source: 'OpenStreetMap', rank: el.type === 'node' ? 1 : 0 });
     }
-    if ((i / BATCH) % 10 === 0) console.log(`  ports ${i + batch.length}/${ports.length}: ${out.length} found, ${failed} batches unanswered`);
+    console.log(`  ports ${Math.min(i + BATCH, ports.length)}/${ports.length}: ${out.length} found, ${unasked.length} ports not asked about`);
     await sleep(1500);
   }
-  return { found: out, failed };
+  return { found: out, unasked };
 }
 
 // -------------------------------------------------------------------- merge
@@ -135,8 +147,18 @@ let wd = [];
 try { wd = await wikidata(); } catch (e) { console.warn(`  ${e.message}`); }
 console.log(`  ${wd.length} terminals`);
 console.log('OpenStreetMap');
-const { found: osm, failed } = await openStreetMap();
-console.log(`  ${osm.length} named features; ${failed} batches unanswered`);
+const { found: osm, unasked } = await openStreetMap();
+console.log(`  ${osm.length} named features; ${unasked.length} ports not asked about this time`);
+
+// Near the ports this run could not ask about, keep what the last run found.
+let previous = [];
+try { previous = JSON.parse(readFileSync(new URL('data/terminals.json', root))); } catch { /* first run */ }
+const kept_before = previous
+  .filter((r) => r[5] === 'OpenStreetMap')
+  .map(([lon, lat, name, kind, operator, source]) => ({ lon, lat, name, kind, operator, source, rank: 0 }))
+  .filter((t) => unasked.some((p) => km(t, { lon: p[1], lat: p[2] }) < 16));
+console.log(`  ${kept_before.length} kept from the previous run`);
+osm.push(...kept_before);
 
 // One entry per terminal: Wikidata first, then OpenStreetMap features that are
 // not the same place (same kind of gas, similar name, within 3 km).
