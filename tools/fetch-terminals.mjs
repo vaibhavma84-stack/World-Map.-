@@ -30,6 +30,8 @@ const kindOf = (text) => {
 // items themselves: kept when their name or description says LNG or LPG and
 // that they are a terminal, plant or facility (not a ship, firm or article).
 const WD = 'https://www.wikidata.org/w/api.php';
+// Proposed terminals that were never built, which Wikidata does not mark so.
+const NEVER_BUILT = /^Crown Landing\b/i;
 const PLACE = /terminal|plant|facility|regasification|liquefaction|import|export|storage|jetty|port|harbou?r|FSRU|floating storage/i;
 const NOT_PLACE = /ship|vessel|carrier|tanker|company|corporation|business|article|scholarly|journal|patent|project company|family name|given name/i;
 
@@ -96,6 +98,7 @@ async function wikidata() {
       if (/power (plant|station)|combined cycle|generating station/i.test(text)) continue;
       if (/proposed|planned|cancel|former|defunct|decommission|abandon|closed/i.test(desc)) continue;
       if (e.claims?.P576) continue;
+      if (NEVER_BUILT.test(name)) continue;
       const coord = e.claims?.P625?.[0]?.mainsnak?.datavalue?.value;
       if (!coord) continue;
       const op = e.claims?.P137?.[0]?.mainsnak?.datavalue?.value?.id || '';
