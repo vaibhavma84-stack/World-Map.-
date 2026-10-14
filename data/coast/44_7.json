@@ -1,0 +1,1 @@
+{"type":"FeatureCollection","features":[{"type":"Feature","properties":{"kind":"mask"},"geometry":{"type":"Polygon","coordinates":[[[7.0,44.15172],[7.00016,44.15],[7.0,44.14828],[7.0,44.15172]]]}},{"type":"Feature","properties":{"kind":"land","c":12},"geometry":{"type":"Polygon","coordinates":[[[7.00016,44.15],[7.0,44.14828],[7.0,44.15172],[7.00016,44.15]]]}}]}
