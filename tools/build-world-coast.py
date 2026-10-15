@@ -12,6 +12,7 @@ Each piece of land takes the colour of the Natural Earth country it falls in.
 Where a piece crosses a border it is cut there; where it lies outside every
 country (Natural Earth's coast is coarser), it takes the nearest country's.
 """
+import contextlib
 import json
 import os
 import sys
@@ -29,9 +30,12 @@ def source_path():
     import importlib.util
     spec = importlib.util.spec_from_file_location('bc', os.path.join(ROOT, 'tools', 'build-coast.py'))
     bc = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(bc)
     sys.argv = sys.argv[:1]
-    return bc.source_path()
+    # Its progress messages go to stdout, which here is the output: send them
+    # to stderr, or they land in the GeoJSON lines and spoil the map file.
+    with contextlib.redirect_stdout(sys.stderr):
+        spec.loader.exec_module(bc)
+        return bc.source_path()
 
 
 def cells(shape, size):
