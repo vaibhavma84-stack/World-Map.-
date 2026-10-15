@@ -1082,5 +1082,28 @@ dialog.addEventListener('close', () => {
 
 // ------------------------------------------------------------------- offline
 if ('serviceWorker' in navigator && location.protocol === 'https:' && !/appassets\.androidplatform\.net/.test(location.host)) {
-  navigator.serviceWorker.register('sw.js').catch(() => {});
+  // An iPhone home-screen app resumes rather than reloads, so look for a new
+  // version at start and whenever it comes back to the front, and reload
+  // once the new one has taken over (only if an older one was in charge).
+  const hadController = !!navigator.serviceWorker.controller;
+  let reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController || reloading) return;
+    reloading = true;
+    location.reload();
+  });
+  navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then((reg) => {
+    const check = () => reg.update().catch(() => {});
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') check(); });
+    setInterval(check, 30 * 60000);
+  }).catch(() => {});
 }
+
+// The version in use, shown in Settings (the name of the app's own cache).
+(async () => {
+  const keep = ['wm-seamarks', 'wm-coast', 'wm-ofm', 'wm-world'];
+  try {
+    const name = (await caches.keys()).find((k) => k.startsWith('wm-') && !keep.includes(k));
+    if (name) $('#app-version').textContent = `Version ${name.slice(3)}`;
+  } catch { /* no caches here */ }
+})();
