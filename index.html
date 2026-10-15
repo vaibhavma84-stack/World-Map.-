@@ -43,6 +43,7 @@
     <button id="locate" class="icon round" type="button" aria-label="Show my position">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
     </button>
+    <button id="btn-3d" class="icon round label" type="button" aria-label="3D view" aria-pressed="false">3D</button>
     <button id="world" class="icon round" type="button" aria-label="Whole world">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/></svg>
     </button>
@@ -50,6 +51,13 @@
 
   <div id="layers" class="layers" hidden>
     <button id="save-area" type="button" class="primary wide">Save this area for use at sea</button>
+    <p class="layers-head">City detail <small>zoom in · online, kept once seen or saved</small></p>
+    <label><input type="checkbox" data-layer="cityroads"> Every street, with names</label>
+    <label><input type="checkbox" data-layer="cityrail"> Railways, metro and stations</label>
+    <label><input type="checkbox" data-layer="citybuildings"> Buildings <small>raised in 3D</small></label>
+    <label><input type="checkbox" data-layer="citygreen"> Parks and land use</label>
+    <label><input type="checkbox" data-layer="cityplaces"> Places, airports and points of interest</label>
+    <p class="layers-head">Map</p>
     <label><input type="checkbox" data-layer="roads"> Major roads and cities <small>offline; road numbers when zoomed in · online, kept once seen</small></label>
     <label><input type="checkbox" data-layer="tss"> Traffic separation and routes <small>TSS, deep-water and recommended routes · offline</small></label>
     <label><input type="checkbox" data-layer="eca"> Emission control areas (ECA) <small>SOx / NOx, MARPOL Annex VI · tap the sea for details</small></label>

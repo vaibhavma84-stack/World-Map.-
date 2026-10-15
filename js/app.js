@@ -4,6 +4,7 @@ import { setupWeather, tideAt, turningPoints, flowImage } from './weather.js';
 import { currentFeatures } from './currents.js';
 import { setupVoyage } from './voyage.js';
 import { addZones, zonesAt, zonesCard } from './zones.js';
+import { addCityDetail, setup3D, CITY_GROUPS } from './city.js';
 import {
   offsetMinutes, zonedToUtc, formatOffset, formatSpan, clock, longDate, shipClock,
   nextClockChange, sun, position,
@@ -246,7 +247,8 @@ const map = new maplibregl.Map({
   minZoom: 0.5,
   // Past zoom 12 the coastline is Natural Earth's and only approximate, but
   // the chart marks need the room to show every buoy.
-  maxZoom: 17,
+  maxZoom: 18,
+  maxPitch: 75,
   attributionControl: false,
   dragRotate: false,
   pitchWithRotate: false,
@@ -351,15 +353,23 @@ const LAYER_GROUPS = {
   eca: ['zones-eca-fill', 'zones-eca-line', 'zones-eca-labels'],
   marpol: ['zones-marpol-line', 'zones-marpol-labels'],
   loadline: ['zones-ll-fill', 'zones-ll-line', 'zones-ll-labels'],
+  ...CITY_GROUPS,
 };
-const shown = { roads: true, eca: true, marpol: true, loadline: true, tss: true, seamarks: true, osmwater: true, terminals: true, currents: true, rivers: true, grid: true, weather: false, ...store.get('layers', {}) };
+const shown = { cityroads: true, cityrail: true, citybuildings: true, citygreen: true, cityplaces: true, roads: true, eca: true, marpol: true, loadline: true, tss: true, seamarks: true, osmwater: true, terminals: true, currents: true, rivers: true, grid: true, weather: false, ...store.get('layers', {}) };
 let wx = null;
 function applyLayers() {
   for (const [group, ids] of Object.entries(LAYER_GROUPS)) {
     for (const id of ids) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', shown[group] ? 'visible' : 'none');
   }
   wx?.setOn(shown.weather);
+  // Buildings: flat, or raised in 3D.
+  if (map.getLayer('city-buildings')) {
+    const b = shown.citybuildings;
+    map.setLayoutProperty('city-buildings', 'visibility', b && !threeD?.isOn() ? 'visible' : 'none');
+    map.setLayoutProperty('city-buildings-3d', 'visibility', b && threeD?.isOn() ? 'visible' : 'none');
+  }
 }
+let threeD = null;
 
 // Traffic separation schemes and routeing measures, from data/tss.json (kept
 // up to date by tools/fetch-tss.mjs), in chart magenta and shown offline.
@@ -565,6 +575,7 @@ async function addOsmWater() {
     },
     paint: { 'text-color': '#7a2e0b', 'text-halo-color': '#fff6e0', 'text-halo-width': 2.2 },
   });
+  addCityDetail(map, { before: 'borders', labelsBefore: PORT_LAYERS[0] });
 }
 const OSM_WATER_LAYERS = [
   {
@@ -712,6 +723,8 @@ $('#layers-btn').onclick = () => {
   $('#layers-btn').setAttribute('aria-expanded', String(!layersBox.hidden));
 };
 map.on('click', () => { layersBox.hidden = true; });
+
+threeD = setup3D(map, $('#btn-3d'), () => applyLayers());
 
 $('#world').onclick = () => map.flyTo({ center: [70, 15], zoom: 1.6 });
 
@@ -1329,16 +1342,28 @@ async function saveArea(button) {
   if (!hasCaches || !ofmTemplate) { alert('Saving areas needs a connection the first time the app is opened.'); return; }
   const b = map.getBounds();
   const tiles = [];
-  for (let z = 6; z <= OFM_MAX; z++) {
+  const level = (z) => {
+    const out = [];
     const [x0, x1, y0, y1] = tileRange(b, z);
-    for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) tiles.push([z, x, y]);
+    for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) out.push([z, x, y]);
+    return out;
+  };
+  for (let z = 6; z <= OFM_MAX; z++) tiles.push(...level(z));
+  // City detail (buildings, every street, stations) when the area is small
+  // enough: zoom 13 and 14.
+  let detail = true;
+  for (const z of [13, 14]) {
+    const more = level(z);
+    if (tiles.length + more.length > AREA_LIMIT) { detail = false; break; }
+    tiles.push(...more);
   }
   if (tiles.length > AREA_LIMIT) {
     alert(`This area is too large to save in detail (${tiles.length.toLocaleString()} pieces). Zoom in a little and save it in parts.`);
     return;
   }
-  const mb = Math.max(1, Math.round(tiles.length * 0.025));
-  if (!confirm(`Save this area for use at sea: detailed rivers, docks and roads with their numbers. About ${mb} MB (${tiles.length.toLocaleString()} pieces), on mobile data or Wi-Fi. Keep the app open until it says done.`)) return;
+  const mb = Math.max(1, Math.round(tiles.length * 0.03));
+  const what = detail ? 'the full city detail: every street, railways, metro and stations, buildings, parks and places' : 'detailed rivers, docks and main roads (zoom in further to save the full city detail too)';
+  if (!confirm(`Save this area for use at sea: ${what}. About ${mb} MB (${tiles.length.toLocaleString()} pieces), on mobile data or Wi-Fi. Keep the app open until it says done.`)) return;
   navigator.storage?.persist?.().catch(() => {});
   button.disabled = true;
   const cache = await caches.open(OFM_SAVED);
