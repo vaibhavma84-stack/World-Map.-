@@ -1,0 +1,50 @@
+name: Fetch source documents
+
+# Downloads reference texts and open data used to draw the regulatory zones
+# (load line zones, MARPOL special areas, emission control areas) into
+# tools/sources/, for building data/zones.json. Run by hand when needed.
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/sources.yml
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download
+        run: |
+          mkdir -p tools/sources
+          cd tools/sources
+          get() { curl -sSfL -A "Mozilla/5.0 WorldMap/1.0" --retry 3 -o "$1" "$2" && echo "ok   $1 ($(wc -c <"$1") bytes)" || { echo "fail $1"; rm -f "$1"; }; }
+          # Load Line zones: Annex II of the 1966 Convention, as in 46 CFR 42.30.
+          for y in 2024 2023 2022 2020 2014; do
+            get "cfr-42.30-$y.xml" "https://www.govinfo.gov/content/pkg/CFR-$y-title46-vol2/xml/CFR-$y-title46-vol2-part42-subpart42-30.xml" && [ -s "cfr-42.30-$y.xml" ] && break
+          done
+          get canada-load-line-schedule.html "https://laws-lois.justice.gc.ca/eng/regulations/C.R.C.,_c._1425/section-sched514247-20060322.html"
+          get singapore-load-line.html "https://sso.agc.gov.sg/SL/MSA1995-RG5?DocDate=20151228&ProvIds=SxII-"
+          # Emission control areas (Marine Regions, CC BY 4.0).
+          get mr-capabilities.xml "https://geo.vliz.be/geoserver/MarineRegions/wfs?service=WFS&version=1.1.0&request=GetCapabilities"
+          if [ -s mr-capabilities.xml ]; then
+            for layer in $(grep -o '<Name>MarineRegions:[^<]*</Name>' mr-capabilities.xml | sed 's/<[^>]*>//g' | grep -iE 'eca|marpol|special|pssa|load' ); do
+              get "mr-${layer#MarineRegions:}.geojson" "https://geo.vliz.be/geoserver/MarineRegions/wfs?service=WFS&version=1.0.0&request=GetFeature&typeName=$layer&outputFormat=application/json"
+            done
+            grep -o '<Name>MarineRegions:[^<]*</Name>' mr-capabilities.xml | sed 's/<[^>]*>//g' > mr-layers.txt
+            rm mr-capabilities.xml
+          fi
+          ls -la
+      - name: Save
+        run: |
+          git add tools/sources
+          git diff --cached --quiet && exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Fetch zone source documents"
+          git pull --rebase -q
+          git push
