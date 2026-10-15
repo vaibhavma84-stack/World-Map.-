@@ -262,3 +262,11 @@ table.ahead .zone { margin-top: 3px; font-size: 12px; color: #1f6e3f; }
 .layers-head small { text-transform: none; letter-spacing: 0; font-weight: 400; }
 .layers { max-height: calc(100vh - 180px); overflow-y: auto; }
 .place-photo { width: 100%; max-height: 220px; object-fit: cover; border-radius: 12px; margin: 6px 0 8px; display: block; }
+
+/* My places */
+#map { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+.myplace-form label { display: block; margin: 8px 0; font-weight: 600; }
+.myplace-form input, .myplace-form select, .myplace-form textarea { display: block; width: 100%; box-sizing: border-box; margin-top: 4px; font: inherit; font-weight: 400; padding: 8px; border: 1px solid #ccc; border-radius: 8px; }
+.myplace-form .row-end, .card .row-end { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; }
+.myplace-note { white-space: normal; margin: 0 0 8px; }
+a.button { display: inline-block; text-decoration: none; padding: 8px 14px; border-radius: 8px; }

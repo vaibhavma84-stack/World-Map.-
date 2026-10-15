@@ -6,6 +6,7 @@ import { setupVoyage } from './voyage.js';
 import { addZones, zonesAt, zonesCard } from './zones.js';
 import { addCityDetail, addHills, setup3D, CITY_GROUPS } from './city.js';
 import { addCityPlaces, placeCard, KINDS as PLACE_KINDS, PLACE_GROUPS } from './places.js';
+import { setupMyPlaces, loadMyPlaces } from './myplaces.js';
 import {
   offsetMinutes, zonedToUtc, formatOffset, formatSpan, clock, longDate, shipClock,
   nextClockChange, sun, position,
@@ -291,11 +292,16 @@ map.on('mousemove', (e) => { $('#coords').textContent = position(e.lngLat.lat, (
 map.getCanvas().addEventListener('mouseleave', () => { $('#coords').textContent = ''; });
 
 // Tap a port, or near one: fingers are wider than dots.
+let myPlaces = null;
+let cityPlaces = [];
 map.on('click', (e) => {
+  if (myPlaces?.justHeld()) return;
   if (voyage?.click(e)) return;
   const pad = 12;
   const box = [[e.point.x - pad, e.point.y - pad], [e.point.x + pad, e.point.y + pad]];
   if (map.getLayer('voyage-ship') && map.queryRenderedFeatures(box, { layers: ['voyage-ship', 'voyage-ahead'] })[0]) { voyage.open(); return; }
+  const mine = myPlaces?.hit(box);
+  if (mine) { myPlaces.show(mine.properties.id); return; }
   const poiLayers = Object.values(PLACE_GROUPS).flat().filter((id) => map.getLayer(id));
   const placeHit = poiLayers.length && map.queryRenderedFeatures(box, { layers: poiLayers })[0];
   if (placeHit) {
@@ -376,8 +382,9 @@ const LAYER_GROUPS = {
   loadline: ['zones-ll-fill', 'zones-ll-line', 'zones-ll-labels'],
   ...CITY_GROUPS,
   ...PLACE_GROUPS,
+  myplaces: ['my-places'],
 };
-const shown = { hills: true, ...Object.fromEntries(Object.keys(PLACE_GROUPS).map((g) => [g, true])), cityroads: true, cityrail: true, citybuildings: true, citygreen: true, cityplaces: true, roads: true, eca: true, marpol: true, loadline: true, tss: true, seamarks: true, osmwater: true, terminals: true, currents: true, rivers: true, grid: true, weather: false, ...store.get('layers', {}) };
+const shown = { myplaces: true, hills: true, ...Object.fromEntries(Object.keys(PLACE_GROUPS).map((g) => [g, true])), cityroads: true, cityrail: true, citybuildings: true, citygreen: true, cityplaces: true, roads: true, eca: true, marpol: true, loadline: true, tss: true, seamarks: true, osmwater: true, terminals: true, currents: true, rivers: true, grid: true, weather: false, ...store.get('layers', {}) };
 let wx = null;
 // Only change what differs: each change makes the map reload that layer's
 // source, and a reload racing a download left the city detail empty.
@@ -627,7 +634,7 @@ async function addOsmWater() {
   });
   addCityDetail(map, { before: 'borders', labelsBefore: PORT_LAYERS[0] });
   addHills(map, PORT_LAYERS[0]);
-  addCityPlaces(map, PORT_LAYERS[0]).then(applyLayers);
+  addCityPlaces(map, PORT_LAYERS[0]).then((data) => { cityPlaces = data?.features || []; applyLayers(); });
 }
 const OSM_WATER_LAYERS = [
   {
@@ -763,6 +770,8 @@ map.on('load', () => {
     reload: $('#wx-reload'), kinds: [...document.querySelectorAll('#wx-bar [data-kind]')],
   });
   voyage = setupVoyage(map, { openPanel, closePanel, $, hint, padding: clearOfPanel });
+  myPlaces = setupMyPlaces(map, { openPanel, closePanel, position });
+  $('#add-place').onclick = () => { layersBox.hidden = true; myPlaces.addAtCentre(); };
   applyLayers();
 });
 const layersBox = $('#layers');
@@ -832,17 +841,32 @@ function search(text) {
     if (p.locode.toLowerCase() === t) score -= 20;
     scored.push([score, p]);
   }
-  return scored.sort((a, b) => a[0] - b[0] || a[1].name.localeCompare(b[1].name)).slice(0, 60).map((x) => x[1]);
+  const portsFound = scored.sort((a, b) => a[0] - b[0] || a[1].name.localeCompare(b[1].name)).slice(0, 60).map((x) => x[1]);
+  // Places: my own first, then the city's (bars, clubs, hotels…).
+  const places = [];
+  const match = (name) => { const n = fold(name || ''); return words.every((w) => n.includes(w)) ? (n.startsWith(t) ? 0 : 1) : -1; };
+  for (const p of loadMyPlaces()) {
+    const m = match(p.n);
+    if (m >= 0) places.push([m - 10, { place: { n: p.n, k: p.k, mine: p.id, note: p.note }, lon: p.lon, lat: p.lat }]);
+  }
+  for (const f of cityPlaces) {
+    const m = f.properties.n ? match(f.properties.n) : -1;
+    if (m >= 0) places.push([m, { place: f.properties, lon: f.geometry.coordinates[0], lat: f.geometry.coordinates[1] }]);
+  }
+  const placesFound = places.sort((a, b) => a[0] - b[0]).slice(0, 25).map((x) => x[1]);
+  return [...placesFound.filter((p) => p.place.mine), ...portsFound.slice(0, 40), ...placesFound.filter((p) => !p.place.mine)];
 }
 
 function renderResults() {
   if (!q.value.trim()) { results.hidden = true; return; }
   results.hidden = false;
   results.innerHTML = found.length
-    ? found.map((p, n) => `<li role="option" data-n="${n}" aria-selected="${n === cursor}">
-        <span class="name">${flag(p.cc)} ${esc(p.name)}</span>
-        <span class="meta">${esc(p.locode || countryName(p.cc))}</span></li>`).join('')
-    : '<li class="none">No port by that name</li>';
+    ? found.map((p, n) => `<li role="option" data-n="${n}" aria-selected="${n === cursor}">${p.place
+      ? `<span class="name">${(PLACE_KINDS[p.place.k] || { icon: '⭐' }).icon} ${esc(p.place.n)}</span>
+        <span class="meta">${p.place.mine ? 'My place' : esc((PLACE_KINDS[p.place.k]?.label || 'Place').replace(/ \(.*\)$/, ''))}</span>`
+      : `<span class="name">${flag(p.cc)} ${esc(p.name)}</span>
+        <span class="meta">${esc(p.locode || countryName(p.cc))}</span>`}</li>`).join('')
+    : '<li class="none">No port or place by that name. Press and hold the map to add your own.</li>';
 }
 
 q.addEventListener('input', () => {
@@ -872,6 +896,12 @@ $('#clear').onclick = () => { q.value = ''; q.dispatchEvent(new Event('input'));
 function choose(p) {
   results.hidden = true;
   q.blur();
+  if (p.place) {
+    if (p.place.mine) myPlaces?.show(p.place.mine);
+    else openPanel(placeCard(p.place, position(p.lat, p.lon)));
+    map.flyTo({ center: [p.lon, p.lat], zoom: Math.max(map.getZoom(), 16), speed: 1.6, padding: clearOfPanel() });
+    return;
+  }
   showPort(p);
   map.flyTo({ center: [p.lon, p.lat], zoom: Math.max(map.getZoom(), 9), speed: 1.6, padding: clearOfPanel() });
 }

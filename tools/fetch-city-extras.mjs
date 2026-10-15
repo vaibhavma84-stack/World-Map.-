@@ -15,6 +15,20 @@ import { readFileSync, writeFileSync } from 'node:fs';
 const CITIES = [
   { name: 'Mumbai', bbox: [18.85, 72.75, 19.35, 73.15] },
 ];
+// Well-known clubs missing from OpenStreetMap, shown at the hotel they are
+// in (the hotel's position from OpenStreetMap; a club whose hotel can't be
+// found there is left out rather than guessed). Kept by hand: check each
+// still runs before adding it, and note where that was read.
+const KNOWN = {
+  Mumbai: [
+    { n: 'Trilogy', k: 'nightclub', host: /^(Hotel )?Sea Princess/i, src: 'Nightclub inside Hotel Sea Princess, Juhu Tara Road. Listed by Time Out, Foursquare and nightlife guides; check it is open before going.' },
+    { n: 'Toy Room', k: 'nightclub', host: /^Grand Hyatt/i, src: 'Nightclub of the London Toy Room group; listings place it at the Grand Hyatt, off the Western Express Highway, Santacruz East. Check before going.' },
+    { n: 'Kitty Su', k: 'nightclub', host: /^The Lalit( Mumbai)?$/i, src: 'Nightclub inside The Lalit, Andheri East. Listed by LBB and nightlife guides; check before going.' },
+    { n: 'AER', k: 'nightclub', host: /^Four Seasons/i, src: 'Rooftop bar and club on the 34th floor of the Four Seasons, Worli. Check before going.' },
+    { n: 'Asilo', k: 'nightclub', host: /^(The )?St\.? Regis/i, src: 'Rooftop bar and club on level 37 of The St. Regis, Lower Parel. Check before going.' },
+  ],
+};
+
 const UA = { 'User-Agent': 'WorldMapCity/1.0 (https://github.com/vaibhavma84-stack/World-Map.-; personal map) node-fetch' };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const SERVERS = [
@@ -83,6 +97,7 @@ function query([s, w, n, e]) {
     node["highway"="traffic_signals"]${b};
     nwr["amenity"~"^(fuel|cafe|restaurant|bar|pub|biergarten|nightclub|cinema|theatre|social_club|social_centre)$"]${b};
     nwr["club"]["name"]${b};
+    nwr["name"~"Grand Hyatt|Sea Princess|Lalit|Four Seasons|St\\.? ?Regis"]${b};
     nwr["leisure"="sports_club"]["name"]${b};
     nwr["name"~"[Gg]ymkhana|[Cc]lub"]["leisure"]${b};
     nwr["name"~"[Gg]ymkhana|[Cc]lub"]["building"]${b};
@@ -156,6 +171,16 @@ for (const city of CITIES) {
     if (t.historic) p.h = t.historic;
     if (t.tourism) p.tr = t.tourism;
     found.push({ type: 'Feature', properties: p, geometry: { type: 'Point', coordinates: [Math.round(lon * 1e5) / 1e5, Math.round(lat * 1e5) / 1e5] } });
+  }
+  // Known clubs, at their hotels.
+  for (const c of KNOWN[city.name] || []) {
+    if (found.some((f) => f.properties.n?.toLowerCase() === c.n.toLowerCase() && ['nightclub', 'bar'].includes(f.properties.k))) continue;
+    const host = els.find((el) => c.host.test(el.tags?.['name:en'] || el.tags?.name || '') && (el.tags?.tourism === 'hotel'))
+      || els.find((el) => c.host.test(el.tags?.['name:en'] || el.tags?.name || ''));
+    if (!host) { console.log(`  ${c.n}: hotel not found in OpenStreetMap; left out`); continue; }
+    const lat = host.lat ?? host.center?.lat, lon = host.lon ?? host.center?.lon;
+    found.push({ type: 'Feature', properties: { k: c.k, city: city.name, n: c.n, src: c.src, at: host.tags['name:en'] || host.tags.name }, geometry: { type: 'Point', coordinates: [Math.round(lon * 1e5) / 1e5, Math.round(lat * 1e5) / 1e5] } });
+    console.log(`  ${c.n}: at ${host.tags.name}`);
   }
   // One mark per club: OpenStreetMap often has the same club as several
   // buildings.

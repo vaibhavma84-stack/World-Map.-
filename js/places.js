@@ -22,7 +22,7 @@ export const KINDS = {
 export const PLACE_GROUPS = Object.fromEntries(Object.keys(KINDS).map((k) => [`poi-${k}`,
   k === 'hotel' ? ['poi-hotel', 'poi-hotel-5'] : k === 'restaurant' ? ['poi-restaurant', 'poi-michelin'] : [`poi-${k}`]]));
 
-function iconImage(emoji, ring, gold = false) {
+export function iconImage(emoji, ring, gold = false) {
   const s = 2, size = (gold ? 34 : 26) * s;
   const c = document.createElement('canvas');
   c.width = c.height = size;
@@ -117,7 +117,7 @@ export async function addCityPlaces(map, labelsBefore) {
     },
     paint: { 'text-color': '#a3271b', 'text-halo-color': '#fffbe6', 'text-halo-width': 2 },
   }, labelsBefore);
-  return true;
+  return data;
 }
 
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -127,6 +127,7 @@ export function placeCard(p, position) {
     : p.lux ? '<div class="big">★★★★★<span class="note"> luxury (5-star class); rating not recorded in OpenStreetMap</span></div>' : '';
   const was = { snooker: 'snooker hall', interest: 'place of interest' }[p.was] || p.was;
   const night = p.was ? `<div class="note">${{ nightclub: 'Lounge or party bar', bar: 'Bar', club: 'Club' }[p.k] || 'Shown here'} (OpenStreetMap lists it as a ${esc(was)}).</div>` : '';
+  const listed = p.src ? `<div class="note">${esc(p.src)}</div>` : '';
   const michelin = p.mi ? `<div class="big">🏵️ Michelin link</div><div class="note">${esc(p.mi)}</div>` : '';
   const rows = [
     ['Cuisine', p.cu], ['Brand', p.br], ['Open', p.oh], ['Phone', p.ph && `<a href="tel:${esc(p.ph)}">${esc(p.ph)}</a>`],
@@ -137,7 +138,7 @@ export function placeCard(p, position) {
   return `<h1>${d.icon} ${esc(p.n || d.label)}</h1>
     <p class="sub">${esc(d.label)} · ${esc(position)}</p>
     ${p.img ? `<img class="place-photo" src="${esc(p.img)}" alt="" loading="lazy" onerror="this.remove()">` : ''}
-    <div class="cards"><div class="card">${stars}${michelin}${night}
+    <div class="cards"><div class="card">${stars}${michelin}${night}${listed}
       ${rows.length ? `<table class="facts">${rows.map(([k, v]) => `<tr><th>${k}</th><td>${k === 'Phone' || k === 'Website' || k === 'Wikipedia' ? v : esc(v)}</td></tr>`).join('')}</table>` : '<div class="note">No more details recorded.</div>'}
     </div></div>
     <p class="hint small">From OpenStreetMap${p.img ? '; photo from Wikimedia Commons' : ''}. Details may be out of date.</p>`;
