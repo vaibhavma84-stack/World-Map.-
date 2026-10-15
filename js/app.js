@@ -487,8 +487,62 @@ function addCurrents() {
 // OpenFreeMap's vector tiles: online, and kept on the phone once seen. Added
 // only once the map has loaded, so at sea with no connection it cannot hold
 // the map up.
-function addOsmWater() {
-  map.addSource('osm', { type: 'vector', url: 'https://tiles.openfreemap.org/planet' });
+// OpenStreetMap's vector tiles (OpenFreeMap): detailed water, docks and
+// roads. Read through the app's own store, the same on iPhone and Android:
+// a tile seen once is kept (the most recent 30,000), and tiles of an area
+// saved for use at sea are kept apart and never cleared. Tiles go to zoom
+// 12 and are magnified beyond, so a saved area is complete at any zoom.
+const OFM_SEEN = 'wm-ofm-seen', OFM_SAVED = 'wm-ofm-saved', OFM_MAX = 12;
+const ofmKey = (z, x, y) => `https://ofm.cache/${z}/${x}/${y}.pbf`;
+let ofmTemplate = null;
+async function ofmTileJson() {
+  try {
+    const r = await fetch('https://tiles.openfreemap.org/planet');
+    if (r.ok) {
+      const j = await r.json();
+      try { localStorage.setItem('wm.ofm.tilejson', JSON.stringify(j)); } catch { /* full */ }
+      return j;
+    }
+  } catch { /* offline */ }
+  try { return JSON.parse(localStorage.getItem('wm.ofm.tilejson')); } catch { return null; }
+}
+async function ofmFetch(z, x, y, signal) {
+  const res = await fetch(ofmTemplate.replace('{z}', z).replace('{x}', x).replace('{y}', y), { signal, cache: 'no-store' });
+  if (res.status === 204 || res.status === 404) return new ArrayBuffer(0);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.arrayBuffer();
+}
+const hasCaches = typeof caches !== 'undefined';
+maplibregl.addProtocol('ofm', async (params, abort) => {
+  const [z, x, y] = params.url.slice('ofm://'.length).split('/').map(Number);
+  const key = ofmKey(z, x, y);
+  if (hasCaches) {
+    for (const name of [OFM_SAVED, OFM_SEEN]) {
+      try { const hit = await (await caches.open(name)).match(key); if (hit) return { data: await hit.arrayBuffer() }; } catch { /* go on */ }
+    }
+  }
+  const data = await ofmFetch(z, x, y, abort.signal);
+  // Copy before handing it over: the map moves the original to its worker.
+  if (hasCaches) {
+    const copy = data.slice(0);
+    caches.open(OFM_SEEN).then((c) => c.put(key, new Response(copy))).catch(() => {});
+  }
+  return { data };
+});
+// Keep the everyday store to its most recent 30,000 tiles.
+if (hasCaches) setTimeout(async () => {
+  try {
+    const c = await caches.open(OFM_SEEN);
+    const keys = await c.keys();
+    for (const k of keys.slice(0, Math.max(0, keys.length - 30000))) await c.delete(k);
+  } catch { /* fine */ }
+}, 20000);
+
+async function addOsmWater() {
+  const tj = await ofmTileJson();
+  if (!tj?.tiles?.[0]) return;
+  ofmTemplate = tj.tiles[0];
+  map.addSource('osm', { type: 'vector', tiles: ['ofm://{z}/{x}/{y}'], minzoom: 0, maxzoom: OFM_MAX, attribution: '© OpenStreetMap · OpenFreeMap' });
   for (const layer of OSM_WATER_LAYERS) map.addLayer(layer, 'rivers-0');
   const main = ['match', ['get', 'class'], ['motorway', 'trunk', 'primary'], true, false];
   const colour = ['match', ['get', 'class'], 'motorway', ROAD[1], 'trunk', ROAD[1], ROAD[2]];
@@ -631,7 +685,7 @@ async function addWorldCoast() {
 
 map.on('load', () => {
   addWorldCoast();
-  addOsmWater();
+  addOsmWater().then(applyLayers);
   addTerminals();
   addTss();
   addRoads();
@@ -1256,6 +1310,78 @@ async function saveHarbours(report) {
   };
 })();
 
+// Save the area on screen for use at sea: OpenStreetMap's detailed water,
+// docks, rivers and numbered roads, zoom 6 to 12 (shown magnified beyond).
+function tileRange(b, z) {
+  const n = 2 ** z;
+  const tx = (lon) => Math.min(n - 1, Math.max(0, Math.floor((lon + 180) / 360 * n)));
+  const ty = (lat) => {
+    const r = Math.max(-85, Math.min(85, lat)) * Math.PI / 180;
+    return Math.min(n - 1, Math.max(0, Math.floor((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * n)));
+  };
+  return [tx(b.getWest()), tx(b.getEast()), ty(b.getNorth()), ty(b.getSouth())];
+}
+const AREA_LIMIT = 40000;
+async function saveArea(button) {
+  if (!hasCaches || !ofmTemplate) { alert('Saving areas needs a connection the first time the app is opened.'); return; }
+  const b = map.getBounds();
+  const tiles = [];
+  for (let z = 6; z <= OFM_MAX; z++) {
+    const [x0, x1, y0, y1] = tileRange(b, z);
+    for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) tiles.push([z, x, y]);
+  }
+  if (tiles.length > AREA_LIMIT) {
+    alert(`This area is too large to save in detail (${tiles.length.toLocaleString()} pieces). Zoom in a little and save it in parts.`);
+    return;
+  }
+  const mb = Math.max(1, Math.round(tiles.length * 0.025));
+  if (!confirm(`Save this area for use at sea: detailed rivers, docks and roads with their numbers. About ${mb} MB (${tiles.length.toLocaleString()} pieces), on mobile data or Wi-Fi. Keep the app open until it says done.`)) return;
+  navigator.storage?.persist?.().catch(() => {});
+  button.disabled = true;
+  const cache = await caches.open(OFM_SAVED);
+  let done = 0, failed = 0, bytes = 0;
+  const queue = [...tiles];
+  const worker = async () => {
+    while (queue.length) {
+      const [z, x, y] = queue.shift();
+      const key = ofmKey(z, x, y);
+      let ok = !!(await cache.match(key));
+      for (let attempt = 0; !ok && attempt < 4; attempt++) {
+        try {
+          const data = await ofmFetch(z, x, y);
+          await cache.put(key, new Response(data));
+          bytes += data.byteLength;
+          ok = true;
+        } catch { await new Promise((w) => setTimeout(w, 1500 * (attempt + 1))); }
+      }
+      if (!ok) failed++;
+      done++;
+      if (done % 25 === 0 || !queue.length) button.textContent = `Saving area… ${done.toLocaleString()} / ${tiles.length.toLocaleString()} (${Math.round(bytes / 1e6)} MB)`;
+    }
+  };
+  await Promise.all(Array.from({ length: 6 }, worker));
+  button.textContent = failed ? `Saved, but ${failed} pieces failed — tap to try again` : 'Area saved for use at sea ✓';
+  button.disabled = false;
+  if (!failed) setTimeout(() => { button.textContent = 'Save this area for use at sea'; }, 6000);
+  showSavedAreas();
+}
+async function showSavedAreas() {
+  const el = $('#saved-areas');
+  if (!el || !hasCaches) return;
+  try {
+    const n = (await (await caches.open(OFM_SAVED)).keys()).length;
+    el.hidden = n === 0;
+    $('#saved-areas-text').textContent = `Saved areas: ${n.toLocaleString()} map pieces kept for use at sea.`;
+  } catch { /* fine */ }
+}
+$('#save-area').onclick = (e) => saveArea(e.currentTarget);
+$('#clear-areas').onclick = async () => {
+  if (!confirm('Delete all saved areas? The rest of the map is not affected.')) return;
+  await caches.delete(OFM_SAVED);
+  showSavedAreas();
+};
+showSavedAreas();
+
 function openSettings() {
   tzSelect.value = settings.homeTz;
   $('#home-name').value = settings.homeName === 'Home' ? '' : settings.homeName;
@@ -1307,7 +1433,7 @@ if ('serviceWorker' in navigator && location.protocol === 'https:' && !/appasset
 
 // The version in use, shown in Settings (the name of the app's own cache).
 (async () => {
-  const keep = ['wm-seamarks', 'wm-coast', 'wm-ofm', 'wm-world'];
+  const keep = ['wm-seamarks', 'wm-coast', 'wm-ofm', 'wm-world', 'wm-ofm-seen', 'wm-ofm-saved'];
   try {
     const name = (await caches.keys()).find((k) => k.startsWith('wm-') && !keep.includes(k) && !k.startsWith('wm-world'));
     if (name) $('#app-version').textContent = `Version ${name.slice(3)}`;

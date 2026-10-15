@@ -49,6 +49,7 @@
   </div>
 
   <div id="layers" class="layers" hidden>
+    <button id="save-area" type="button" class="primary wide">Save this area for use at sea</button>
     <label><input type="checkbox" data-layer="roads"> Major roads and cities <small>offline; road numbers when zoomed in · online, kept once seen</small></label>
     <label><input type="checkbox" data-layer="tss"> Traffic separation and routes <small>TSS, deep-water and recommended routes · offline</small></label>
     <label><input type="checkbox" data-layer="eca"> Emission control areas (ECA) <small>SOx / NOx, MARPOL Annex VI · tap the sea for details</small></label>
@@ -120,6 +121,10 @@
       </div>
       <p class="hint">Set the ship's clock to the zone time kept on board, and the port card says how far to advance or retard.</p>
       <p class="hint small">Map: Natural Earth; coastlines, roads and detailed rivers © OpenStreetMap contributors; rivers and tributaries from HydroSHEDS (WWF). Ports: NGA World Port Index (via seaport-data-js, CC BY 4.0) and UN/LOCODE. Not for navigation.</p>
+      <div id="saved-areas" hidden>
+        <p class="hint" id="saved-areas-text"></p>
+        <button id="clear-areas" type="button" class="secondary">Delete saved areas</button>
+      </div>
       <p class="hint small" id="app-version"></p>
       <div class="row-end"><button class="primary" value="ok">Done</button></div>
     </form>
