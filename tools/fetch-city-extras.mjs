@@ -46,6 +46,8 @@ async function overpass(query) {
   return null;
 }
 
+const NOT_CLUB = /club ?house|^(the )?club$|swimming|pool\b|playground|tennis court|ground|field|lawn|stadium|\bgym\b|fitness|health club|yoga|academy|hall\b|^gymkhana$|rotary|lion'?s club|board game/i;
+
 // Each element's kind, from its tags (first match wins).
 function kindOf(t) {
   const sport = t.sport || '';
@@ -58,7 +60,10 @@ function kindOf(t) {
   // Members' clubs and gymkhanas (golf clubs stay with golf, above).
   const name = t['name:en'] || t.name || '';
   if (t.club || ['social_club', 'social_centre'].includes(t.amenity) || t.leisure === 'sports_club'
-    || (/gymkhana|\bclub\b/i.test(name) && (t.leisure || t.sport || t.building || t.amenity === 'community_centre'))) return 'club';
+    || (/gymkhana|\bclub\b/i.test(name) && (t.leisure || t.sport || t.building || t.amenity === 'community_centre'))) {
+    // Not a housing society's club house, a gym, or a club's pool or ground.
+    return NOT_CLUB.test(name) ? null : 'club';
+  }
   if (t.amenity === 'bar' || t.amenity === 'pub' || t.amenity === 'biergarten') return 'bar';
   // Bars listed as restaurants ("bar & restaurant", breweries, permit rooms).
   if (['restaurant', 'cafe'].includes(t.amenity) && (t.bar === 'yes' || /\bbar\b|\bpub\b|brew|taproom|tavern|\bwine|\bbeer|permit room/i.test(name))) return 'bar';
@@ -151,6 +156,15 @@ for (const city of CITIES) {
     if (t.historic) p.h = t.historic;
     if (t.tourism) p.tr = t.tourism;
     found.push({ type: 'Feature', properties: p, geometry: { type: 'Point', coordinates: [Math.round(lon * 1e5) / 1e5, Math.round(lat * 1e5) / 1e5] } });
+  }
+  // One mark per club: OpenStreetMap often has the same club as several
+  // buildings.
+  for (let i = found.length - 1; i >= 0; i--) {
+    const a = found[i];
+    if (a.properties.k !== 'club') continue;
+    const twin = found.findIndex((b, j) => j < i && b.properties.k === 'club' && b.properties.n.toLowerCase() === a.properties.n.toLowerCase()
+      && Math.abs(b.geometry.coordinates[0] - a.geometry.coordinates[0]) < 0.005 && Math.abs(b.geometry.coordinates[1] - a.geometry.coordinates[1]) < 0.005);
+    if (twin >= 0) found.splice(i, 1);
   }
   const wd = [...new Set(found.map((f) => f.properties.wd).filter(Boolean))];
   const pics = await photos(wd);
