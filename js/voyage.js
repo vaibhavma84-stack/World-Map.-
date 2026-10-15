@@ -3,6 +3,7 @@
 // those times, with how the sea will meet the ship. Kept on the phone.
 // Not for navigation.
 import { weatherAlong } from './weather.js';
+import { zonesAt, zonesBrief } from './zones.js';
 
 const AHEAD = [3, 6, 9, 12, 24];
 const R_NM = 3440.065;
@@ -357,7 +358,8 @@ export function setupVoyage(map, ui) {
           <div><b>Swell</b> ${one(w.swell)} m ${deg(w.swellDir)}${w.swellPer ? `, ${Math.round(w.swellPer)} s` : ''}${w.swellDir != null ? ` · <i>${meets(w.swellDir, p.heading)}</i>` : ''}</div>
           <div><b>Current</b> sets ${deg(w.currentDir)} ${w.current != null ? w.current.toFixed(1) : '—'} kn</div>
           <div><b>Pressure</b> ${w.pressure != null ? Math.round(w.pressure) : '—'} hPa${w.visibility != null ? ` · vis ${w.visibility >= 10000 ? '10+ km' : `${(w.visibility / 1000).toFixed(1)} km`}` : ''}</div>`
-        : '<div class="note">Beyond the forecast</div>'}</td></tr>`;
+        : '<div class="note">Beyond the forecast</div>'}
+          <div class="zone">${zonesBrief(zonesAt(p.lon, p.lat, new Date(t0 + h * 3600000)))}</div></td></tr>`;
     }).join('');
     const age = v.ahead?.at ? Math.round((Date.now() - v.ahead.at) / 60000) : 0;
     box.innerHTML = `<div class="card"><h3>Weather ahead</h3>

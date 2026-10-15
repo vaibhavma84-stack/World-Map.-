@@ -253,3 +253,4 @@ table.ahead tr.lv2 th { box-shadow: inset 3px 0 #c0392b; padding-left: 8px; }
 .lv-key i.k2 { background: #c0392b; }
 table.ahead th > span { display: block; font-weight: 400; color: var(--muted); }
 table.ahead th > span.pos { font: 12px/1.35 ui-monospace, Menlo, monospace; margin-top: 2px; }
+table.ahead .zone { margin-top: 3px; font-size: 12px; color: #1f6e3f; }

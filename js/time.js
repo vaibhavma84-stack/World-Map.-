@@ -108,9 +108,10 @@ export function sun(lat, lon, date = new Date()) {
 /** 51°54.0′N 004°29.0′E — the way positions are written at sea. */
 export function position(lat, lon) {
   const f = (v, w, pos, neg) => {
-    const a = Math.abs(v);
-    const d = Math.floor(a);
-    const m = (a - d) * 60;
+    // Round to tenths of a minute first, so 2°59.98′ shows as 3°00.0′.
+    const tenths = Math.round(Math.abs(v) * 600);
+    const d = Math.floor(tenths / 600);
+    const m = (tenths % 600) / 10;
     return `${String(d).padStart(w, '0')}°${m.toFixed(1).padStart(4, '0')}′${v < 0 ? neg : pos}`;
   };
   return `${f(lat, 2, 'N', 'S')} ${f(lon, 3, 'E', 'W')}`;

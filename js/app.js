@@ -3,6 +3,7 @@ import { PHRASES, LANGUAGES, TERMS, languageName } from './languages.js';
 import { setupWeather, tideAt, turningPoints, flowImage } from './weather.js';
 import { currentFeatures } from './currents.js';
 import { setupVoyage } from './voyage.js';
+import { addZones, zonesAt, zonesCard } from './zones.js';
 import {
   offsetMinutes, zonedToUtc, formatOffset, formatSpan, clock, longDate, shipClock,
   nextClockChange, sun, position,
@@ -293,6 +294,7 @@ map.on('click', (e) => {
   } else {
     const land = map.queryRenderedFeatures(e.point, { layers: ['land'] })[0];
     if (land) showCountry(land.properties);
+    else if (shown.eca || shown.marpol || shown.loadline) showZones(e.lngLat);
     else closePanel();
   }
 });
@@ -344,8 +346,11 @@ const LAYER_GROUPS = {
   osmwater: ['osm-water', 'osm-water-edge', 'osm-waterway'],
   rivers: ['rivers-0', 'rivers-6', 'rivers-9', 'river-names-0', 'river-names-5', 'river-names-9', 'lakes', 'lake-names'],
   grid: ['grid'],
+  eca: ['zones-eca-fill', 'zones-eca-line', 'zones-eca-labels'],
+  marpol: ['zones-marpol-line', 'zones-marpol-labels'],
+  loadline: ['zones-ll-fill', 'zones-ll-line', 'zones-ll-labels'],
 };
-const shown = { tss: true, seamarks: true, osmwater: true, terminals: true, currents: true, rivers: true, grid: true, weather: false, ...store.get('layers', {}) };
+const shown = { eca: true, marpol: true, loadline: true, tss: true, seamarks: true, osmwater: true, terminals: true, currents: true, rivers: true, grid: true, weather: false, ...store.get('layers', {}) };
 let wx = null;
 function applyLayers() {
   for (const [group, ids] of Object.entries(LAYER_GROUPS)) {
@@ -530,6 +535,7 @@ map.on('load', () => {
   addOsmWater();
   addTerminals();
   addTss();
+  addZones(map, 'borders').then(applyLayers);
   addCurrents();
   wx = setupWeather(map, {
     bar: $('#wx-bar'), slider: $('#wx-slider'), time: $('#wx-time'), status: $('#wx-status'),
@@ -842,6 +848,16 @@ function gasCard(p) {
       <span class="gname">${esc(t.name)}</span>
       <span class="note">${nm.toFixed(1)} nm${t.operator ? ` · ${esc(t.operator)}` : ''}</span>
     </button></li>`).join('')}</ul></div>`;
+}
+
+// A tap at sea: the emission control area, MARPOL special area and load
+// line zone there, with the season now.
+function showZones(lngLat) {
+  clearInterval(ticker);
+  current = null;
+  const lon = ((lngLat.lng + 540) % 360) - 180;
+  map.getSource('picked')?.setData({ type: 'Feature', geometry: { type: 'Point', coordinates: [lon, lngLat.lat] }, properties: {} });
+  openPanel(zonesCard(zonesAt(lon, lngLat.lat), position(lngLat.lat, lon)));
 }
 
 function showTerminal(t) {

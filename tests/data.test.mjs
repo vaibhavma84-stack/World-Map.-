@@ -93,4 +93,22 @@ ok(ist(s.rise) >= '06:25' && ist(s.rise) <= '06:35' && ist(s.set) >= '18:14' && 
 ok(sun(78, 15, new Date('2026-06-21T12:00Z')).polar === 'day', 'Svalbard midnight sun');
 ok(position(51.9, 4.4833) === '51°54.0′N 004°29.0′E', 'position format');
 
+
+// Regulatory areas: well-formed, and a few known places in the right areas.
+{
+  const zones = json('zones');
+  ok(zones.features.length >= 30 && zones.features.every((f) => ['eca', 'marpol', 'll'].includes(f.properties.k)), 'zones well-formed');
+  globalThis.fetch = async () => ({ ok: true, json: async () => zones });
+  const z = await import('../js/zones.js');
+  await z.zonesReady;
+  const at = (lon, lat, d) => z.zonesAt(lon, lat, new Date(d));
+  ok(at(3, 55, '2026-01-10').eca.some((e) => /North Sea/.test(e.name)), 'North Sea is an ECA');
+  ok(at(56.5, 26.5, '2026-01-10').marpol.some((m) => m.name === 'Gulfs area'), 'Hormuz is in the Gulfs special area');
+  ok(at(56.5, 26.5, '2026-01-10').ll?.season === 'T', 'Persian Gulf is Tropical');
+  ok(at(-40, 50, '2026-01-10').ll?.season === 'W' && at(-40, 50, '2026-07-10').ll?.season === 'S', 'N Atlantic Zone I winter and summer');
+  ok(at(64, 15, '2026-07-10').ll?.season === 'S' && at(64, 15, '2026-01-10').ll?.season === 'T', 'Arabian Sea seasonal tropical');
+  ok(!at(150, -30, '2026-01-10').ll && !at(150, -30, '2026-01-10').eca.length, 'off Sydney: Summer Zone, no ECA');
+  ok(at(10, 38, '2026-01-10').eca.some((e) => /Mediterranean/.test(e.name)), 'Mediterranean SOx ECA');
+}
+
 console.log(`${checks} checks passed`);
