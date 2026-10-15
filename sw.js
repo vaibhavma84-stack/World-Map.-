@@ -107,6 +107,8 @@ async function worldPiece(request) {
     if (res.ok) { await cache.put(url.href, res.clone()); worldBlob = null; }
     return res;
   }
+  // The app's own "save" reads (cache: no-store) keep their pieces themselves.
+  if (request.cache === 'no-store') return fetch(request);
   const m = range.match(/bytes=(\d+)-(\d*)/);
   const start = +m[1];
   if (!worldBlob) {

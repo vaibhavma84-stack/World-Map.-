@@ -1040,30 +1040,119 @@ if (!coastIndex || !('serviceWorker' in navigator) || /appassets\.androidplatfor
 }
 
 // Save the whole world's coastline file on the phone (iPhone; Android has it).
+// Read in pieces of 4 MB, each tried again if the signal drops, so it works
+// over mobile data as well as Wi-Fi; the pieces are joined and kept whole.
+async function saveWorldFile(report) {
+  const cache = await caches.open((await caches.keys()).find((k) => k.startsWith('wm-world')) || 'wm-world-dev');
+  if (await cache.match(WORLD_LAND)) return true;
+  const head = await fetch(WORLD_LAND, { headers: { Range: 'bytes=0-0' } });
+  const total = +(head.headers.get('Content-Range') || '').split('/')[1];
+  if (!total) throw new Error('size unknown');
+  // Each finished piece is kept, so after a lost signal it carries on.
+  const STEP = 4 << 20;
+  const parts = [];
+  for (let from = 0, i = 0; from < total; from += STEP, i++) {
+    const to = Math.min(from + STEP, total) - 1;
+    const key = `${WORLD_LAND}?piece=${i}&of=${total}`;
+    const kept = await cache.match(key);
+    if (kept) { parts.push(await kept.blob()); continue; }
+    for (let attempt = 0; ; attempt++) {
+      try {
+        const r = await fetch(WORLD_LAND, { headers: { Range: `bytes=${from}-${to}` }, cache: 'no-store' });
+        if (r.status !== 206) throw new Error(`HTTP ${r.status}`);
+        const blob = await r.blob();
+        await cache.put(key, new Response(blob));
+        parts.push(blob);
+        break;
+      } catch (e) {
+        if (attempt >= 8) throw e;
+        report(`Signal lost — retrying (${Math.round(from / 1e6)} of ${Math.round(total / 1e6)} MB)`);
+        await new Promise((ok) => setTimeout(ok, 3000 * (attempt + 1)));
+      }
+    }
+    report(`${Math.round((to + 1) / 1e6)} of ${Math.round(total / 1e6)} MB`, (to + 1) / total);
+  }
+  await cache.put(WORLD_LAND, new Response(new Blob(parts), {
+    headers: { 'Content-Type': 'application/octet-stream', 'Content-Length': String(total) },
+  }));
+  for (const req of await cache.keys()) if (req.url.includes('?piece=')) await cache.delete(req);
+  return true;
+}
+
+// Every harbour coastline square; those already kept come from the phone.
+async function saveHarbours(report) {
+  const keys = Object.keys(coastIndex?.cells || {});
+  const totalMb = Object.values(coastIndex?.cells || {}).reduce((a, b) => a + b, 0) / 1e6;
+  let done = 0, failed = 0;
+  const queue = [...keys];
+  const next = async () => {
+    while (queue.length) {
+      const k = queue.shift();
+      let ok = false;
+      for (let attempt = 0; attempt < 4 && !ok; attempt++) {
+        try { const r = await fetch(coastUrl(k)); await r.arrayBuffer(); ok = r.ok; } catch { await new Promise((w) => setTimeout(w, 2000 * (attempt + 1))); }
+      }
+      if (!ok) failed++;
+      done++;
+      if (done % 10 === 0) report(`${done} of ${keys.length} harbour areas (${Math.round(totalMb * done / keys.length)} of ${Math.round(totalMb)} MB)`, done / keys.length);
+    }
+  };
+  await Promise.all([next(), next(), next(), next()]);
+  return failed;
+}
+
 (async () => {
   const btn = $('#save-world');
-  if (!('serviceWorker' in navigator) || /appassets\.androidplatform\.net/.test(location.host) || !(await worldReady)) return;
-  let size = '';
-  try {
-    const r = await fetch(WORLD_LAND, { headers: { Range: 'bytes=0-0' } });
-    const total = +(r.headers.get('Content-Range') || '').split('/')[1];
-    if (total) size = ` (${Math.round(total / 1e6)} MB)`;
-  } catch { /* size unknown */ }
-  btn.textContent = `Save the whole world's coastline${size}`;
-  btn.hidden = false;
-  $('#save-world-hint').hidden = false;
+  const all = $('#save-all');
+  if (!('serviceWorker' in navigator) || /appassets\.androidplatform\.net/.test(location.host)) return;
+  const world = await worldReady;
+  let worldMb = 0;
+  if (world) {
+    try {
+      const r = await fetch(WORLD_LAND, { headers: { Range: 'bytes=0-0' } });
+      worldMb = Math.round(+(r.headers.get('Content-Range') || '').split('/')[1] / 1e6) || 0;
+    } catch { /* size unknown */ }
+    btn.textContent = `Save the whole world's coastline${worldMb ? ` (${worldMb} MB)` : ''}`;
+    btn.hidden = false;
+    $('#save-world-hint').hidden = false;
+  }
+  const harbourMb = Math.round(Object.values(coastIndex?.cells || {}).reduce((a, b) => a + b, 0) / 1e6);
+  all.textContent = `Download everything for use at sea (about ${worldMb + harbourMb} MB)`;
+  all.hidden = false;
+  $('#save-all-hint').hidden = false;
+
+  // Ask the phone to keep it (not clear it when space runs low).
+  const keep = () => navigator.storage?.persist?.().catch(() => {});
+
   btn.onclick = async () => {
     btn.disabled = true;
-    btn.textContent = 'Saving… keep the app open, on Wi-Fi';
+    keep();
     try {
-      const r = await fetch(WORLD_LAND);
-      await r.arrayBuffer();
-      btn.textContent = r.ok ? 'World coastline saved' : 'Could not save; try again with a connection';
-      btn.disabled = r.ok;
+      await saveWorldFile((t) => { btn.textContent = `Saving… ${t}`; });
+      btn.textContent = 'World coastline saved';
     } catch {
-      btn.textContent = 'Could not save; try again with a connection';
+      btn.textContent = 'Stopped; tap to carry on when there is a signal';
       btn.disabled = false;
     }
+  };
+
+  all.onclick = async () => {
+    if (!confirm(`This downloads about ${worldMb + harbourMb} MB, on mobile data if you are not on Wi-Fi. Keep the app open until it says done. Go ahead?`)) return;
+    all.disabled = true;
+    keep();
+    const say = (t) => { all.textContent = t; };
+    let ok = true;
+    if (world) {
+      try { await saveWorldFile((t) => say(`1/2 World coastline: ${t}`)); } catch { ok = false; }
+    }
+    const failed = await saveHarbours((t) => say(`2/2 Harbours: ${t}`));
+    if (failed) ok = false;
+    // The data files the app reads (TSS, zones, ports, rates…) are kept by
+    // the app itself; refresh them too.
+    try { (await navigator.serviceWorker.getRegistration())?.update(); } catch { /* fine */ }
+    say(ok ? 'Everything saved for use at sea' : 'Some parts did not download; tap to carry on (what is saved is kept)');
+    all.disabled = ok;
+    if (ok) btn.textContent = 'World coastline saved';
   };
 })();
 
