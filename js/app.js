@@ -1120,7 +1120,7 @@ if ('serviceWorker' in navigator && location.protocol === 'https:' && !/appasset
 (async () => {
   const keep = ['wm-seamarks', 'wm-coast', 'wm-ofm', 'wm-world'];
   try {
-    const name = (await caches.keys()).find((k) => k.startsWith('wm-') && !keep.includes(k));
+    const name = (await caches.keys()).find((k) => k.startsWith('wm-') && !keep.includes(k) && !k.startsWith('wm-world'));
     if (name) $('#app-version').textContent = `Version ${name.slice(3)}`;
   } catch { /* no caches here */ }
 })();

@@ -58,6 +58,13 @@ jobs:
             echo "::warning::Site over 1 GB with the world coastline; leaving it out"
             rm -f _site/data/land.pmtiles
           fi
+          # Name the iPhone's coastline cache after this file, so pieces kept from
+          # an older file are dropped rather than mixed with the new one.
+          if [ -f _site/data/land.pmtiles ]; then
+            id=$(sha256sum _site/data/land.pmtiles | cut -c1-12)
+            sed -i "s/const WORLD_ID = '[^']*'/const WORLD_ID = '$id'/" _site/sw.js
+            grep -q "WORLD_ID = '$id'" _site/sw.js
+          fi
           du -sh _site
 
       - uses: actions/upload-pages-artifact@v3

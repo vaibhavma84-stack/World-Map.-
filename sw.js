@@ -88,7 +88,11 @@ async function ofmTile(request) {
 // The world coastline file is read a piece at a time (HTTP ranges). Each
 // piece read is kept; if the whole file has been saved (Settings), pieces are
 // cut from it, so the whole world's detailed coast works at sea.
-const WORLD = 'wm-world';
+// Named after the file it holds (stamped by the Pages build), so pieces of an
+// older coastline file are never mixed with a newer one: a new file, a new
+// cache, and the old one is cleared when this version takes over.
+const WORLD_ID = 'dev';
+const WORLD = `wm-world-${WORLD_ID}`;
 let worldBlob = null;
 async function worldPiece(request) {
   const cache = await caches.open(WORLD);
