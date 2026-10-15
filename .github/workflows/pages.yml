@@ -49,8 +49,8 @@ jobs:
           cp -r css js data fonts vendor icons _site/
           # The world coastline file, kept on the 'world-coast' release.
           gh release download world-coast -p land.pmtiles -D _site/data || echo "No world coastline file yet"
-          # The smaller rivers file (main tributaries) for the iPhone site.
-          gh release download rivers -p rivers-lite.pmtiles -O _site/data/rivers.pmtiles || echo "No rivers file yet"
+          # The rivers and tributaries file.
+          gh release download rivers -p rivers.pmtiles -D _site/data || echo "No rivers file yet"
           # A new version name makes phones fetch the new files.
           sed -i "s/const VERSION = '[^']*'/const VERSION = 'wm-${GITHUB_SHA::8}'/" _site/sw.js
           grep -q "wm-${GITHUB_SHA::8}" _site/sw.js

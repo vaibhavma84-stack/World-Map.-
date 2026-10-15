@@ -262,7 +262,7 @@ window.wmMap = map; // for checks from outside (tools/diag-site.mjs)
 map.touchZoomRotate.disableRotation();
 map.addControl(new maplibregl.AttributionControl({
   compact: true,
-  customAttribution: 'Natural Earth · © OpenStreetMap · HydroSHEDS · NGA World Port Index · UN/LOCODE',
+  customAttribution: 'Natural Earth · © OpenStreetMap · NGA World Port Index · UN/LOCODE',
 }), 'bottom-right');
 map.addControl(new maplibregl.ScaleControl({ unit: 'nautical', maxWidth: 90 }), 'bottom-left');
 
@@ -345,7 +345,7 @@ const LAYER_GROUPS = {
   terminals: ['terminals'],
   tss: ['tss-zone', 'tss-area-edge', 'tss-line', 'tss-lane', 'tss-track', 'tss-arrows'],
   osmwater: ['osm-water', 'osm-water-edge', 'osm-waterway'],
-  rivers: ['rivers-hydro', 'rivers-0', 'rivers-6', 'rivers-9', 'river-names-0', 'river-names-5', 'river-names-9', 'lakes', 'lake-names'],
+  rivers: ['rivers-hydro', 'rivers-hydro-names', 'rivers-0', 'rivers-6', 'rivers-9', 'river-names-0', 'river-names-5', 'river-names-9', 'lakes', 'lake-names'],
   grid: ['grid'],
   roads: ['roads-3', 'roads-2', 'roads-1-case', 'roads-1', 'osm-roads-case', 'osm-roads', 'osm-road-refs', 'cities', 'city-names'],
   eca: ['zones-eca-fill', 'zones-eca-line', 'zones-eca-labels'],
@@ -647,9 +647,9 @@ function usePmtiles() {
   return true;
 }
 
-// Rivers and tributaries everywhere (HydroRIVERS), from data/rivers.pmtiles
-// where the app carries it: the larger rivers from afar, the smaller
-// tributaries as you zoom in, under Natural Earth's named rivers.
+// Rivers and their tributaries everywhere, with names (OpenStreetMap), from
+// data/rivers.pmtiles where the app carries it: under Natural Earth's main
+// rivers, named along their length as you zoom in.
 const RIVERS_FILE = new URL('data/rivers.pmtiles', location.href).href;
 async function addHydroRivers() {
   try {
@@ -659,16 +659,19 @@ async function addHydroRivers() {
   } catch { return; }
   map.addSource('hydro', { type: 'vector', url: `pmtiles://${RIVERS_FILE}`, maxzoom: 10 });
   map.addLayer({
-    id: 'rivers-hydro', type: 'line', source: 'hydro', 'source-layer': 'rivers',
+    id: 'rivers-hydro', type: 'line', source: 'hydro', 'source-layer': 'rivers', minzoom: 4,
     layout: { 'line-cap': 'round', 'line-join': 'round' },
-    paint: {
-      'line-color': '#5b9bd0',
-      'line-width': ['interpolate', ['linear'], ['zoom'],
-        3, ['interpolate', ['linear'], ['get', 'u'], 1000, 0.3, 100000, 0.8, 1000000, 1.6],
-        10, ['interpolate', ['linear'], ['get', 'u'], 1000, 0.9, 100000, 2.2, 1000000, 3.4]],
-      'line-opacity': 0.85,
-    },
+    paint: { 'line-color': '#5b9bd0', 'line-width': zoomed([[4, 0.4], [7, 0.9], [10, 1.6], [13, 2.4]]), 'line-opacity': 0.9 },
   }, 'rivers-0');
+  map.addLayer({
+    id: 'rivers-hydro-names', type: 'symbol', source: 'hydro', 'source-layer': 'rivers', minzoom: 7,
+    filter: ['has', 'n'],
+    layout: {
+      'symbol-placement': 'line', 'symbol-spacing': 350, 'text-field': ['get', 'n'], 'text-font': ['OpenSans-Italic'],
+      'text-size': 11, 'text-padding': 20, 'text-max-angle': 30,
+    },
+    paint: { 'text-color': '#2f6f9f', 'text-halo-color': 'rgba(255,255,255,0.9)', 'text-halo-width': 1.4 },
+  });
   applyLayers();
 }
 
