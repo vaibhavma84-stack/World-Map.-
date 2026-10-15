@@ -23,7 +23,7 @@ const KNOWN = {
   Mumbai: [
     { n: 'Trilogy', k: 'nightclub', host: /^(Hotel )?Sea Princess/i, src: 'Nightclub inside Hotel Sea Princess, Juhu Tara Road. Listed by Time Out, Foursquare and nightlife guides; check it is open before going.' },
     { n: 'Toy Room', k: 'nightclub', host: /^Grand Hyatt/i, src: 'Nightclub of the London Toy Room group; listings place it at the Grand Hyatt, off the Western Express Highway, Santacruz East. Check before going.' },
-    { n: 'Kitty Su', k: 'nightclub', host: /^The Lalit( Mumbai)?$/i, src: 'Nightclub inside The Lalit, Andheri East. Listed by LBB and nightlife guides; check before going.' },
+    { n: 'Kitty Su', k: 'nightclub', host: /^(The )?Lalit Mumbai$|^The Lalit$/i, src: 'Nightclub inside The Lalit, Andheri East. Listed by LBB and nightlife guides; check before going.' },
     { n: 'AER', k: 'nightclub', host: /^Four Seasons/i, src: 'Rooftop bar and club on the 34th floor of the Four Seasons, Worli. Check before going.' },
     { n: 'Asilo', k: 'nightclub', host: /^(The )?St\.? Regis/i, src: 'Rooftop bar and club on level 37 of The St. Regis, Lower Parel. Check before going.' },
   ],
@@ -174,7 +174,10 @@ for (const city of CITIES) {
   }
   // Known clubs, at their hotels.
   for (const c of KNOWN[city.name] || []) {
-    if (found.some((f) => f.properties.n?.toLowerCase() === c.n.toLowerCase() && ['nightclub', 'bar'].includes(f.properties.k))) continue;
+    // Already in OpenStreetMap (as a bar, say): keep its details, show it
+    // with the clubs.
+    const there = found.find((f) => f.properties.n?.toLowerCase() === c.n.toLowerCase() && ['nightclub', 'bar'].includes(f.properties.k));
+    if (there) { there.properties.k = c.k; there.properties.src = c.src; console.log(`  ${c.n}: in OpenStreetMap already`); continue; }
     const host = els.find((el) => c.host.test(el.tags?.['name:en'] || el.tags?.name || '') && (el.tags?.tourism === 'hotel'))
       || els.find((el) => c.host.test(el.tags?.['name:en'] || el.tags?.name || ''));
     if (!host) { console.log(`  ${c.n}: hotel not found in OpenStreetMap; left out`); continue; }
