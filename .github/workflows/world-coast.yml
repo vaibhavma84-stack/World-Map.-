@@ -52,7 +52,7 @@ jobs:
 
       - name: Make the map file
         run: |
-          tippecanoe -o tools/.cache/land.pmtiles -l land -Z5 -z12 \
+          tippecanoe -o tools/.cache/land.pmtiles -l land -Z5 -z11 \
             -P --no-tile-size-limit --no-feature-limit --detect-shared-borders \
             --simplification=2 --force tools/.cache/land.geojsonl
           ls -lh tools/.cache/land.pmtiles

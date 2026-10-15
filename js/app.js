@@ -522,7 +522,7 @@ async function addWorldCoast() {
   if (!(await worldReady) || typeof pmtiles === 'undefined') return;
   const protocol = new pmtiles.Protocol();
   maplibregl.addProtocol('pmtiles', protocol.tile);
-  map.addSource('world', { type: 'vector', url: `pmtiles://${WORLD_LAND}`, maxzoom: 12 });
+  map.addSource('world', { type: 'vector', url: `pmtiles://${WORLD_LAND}`, maxzoom: 11 });
   // Sea over Natural Earth's land, then the detailed land: both from zoom 8.
   map.addLayer({ id: 'world-sea', type: 'background', minzoom: 8, paint: { 'background-color': SEA } }, 'detail-mask');
   map.addLayer({
