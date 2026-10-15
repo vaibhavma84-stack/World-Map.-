@@ -1,0 +1,35 @@
+name: Sample map pieces
+
+# Fetches a few OpenFreeMap pieces of Mumbai into tests/tiles/ so the city
+# detail can be checked against real data offline. Run from the Actions tab.
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/sample-tiles.yml
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          set -e
+          mkdir -p tests/tiles
+          url=$(curl -sf https://tiles.openfreemap.org/planet | python3 -c 'import json,sys; print(json.load(sys.stdin)["tiles"][0])')
+          echo "$url" > tests/tiles/template.txt
+          # Colaba / Fort / Churchgate, and Bandra, at zoom 12 to 14.
+          for t in 12/2876/1828 13/5753/3656 14/11506/7313 14/11505/7313 14/11506/7312 14/11506/7308; do
+            f="tests/tiles/$(echo $t | tr / -).pbf"
+            u=$(echo "$url" | sed "s#{z}/{x}/{y}#$t#")
+            curl -sf -D - -o "$f" "$u" | grep -iE '^(HTTP|content-length|content-encoding|content-type)' || true
+            ls -l "$f"
+          done
+      - run: |
+          git config user.name github-actions
+          git config user.email github-actions@users.noreply.github.com
+          git add tests/tiles
+          git commit -m "Sample map pieces of Mumbai" && git push || true
