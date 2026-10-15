@@ -260,3 +260,4 @@ table.ahead .zone { margin-top: 3px; font-size: 12px; color: #1f6e3f; }
 .layers-head { margin: 8px 0 2px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
 .layers-head small { text-transform: none; letter-spacing: 0; font-weight: 400; }
 .layers { max-height: calc(100vh - 180px); overflow-y: auto; }
+.place-photo { width: 100%; max-height: 220px; object-fit: cover; border-radius: 12px; margin: 6px 0 8px; display: block; }

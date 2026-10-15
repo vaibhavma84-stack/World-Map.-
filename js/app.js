@@ -4,7 +4,8 @@ import { setupWeather, tideAt, turningPoints, flowImage } from './weather.js';
 import { currentFeatures } from './currents.js';
 import { setupVoyage } from './voyage.js';
 import { addZones, zonesAt, zonesCard } from './zones.js';
-import { addCityDetail, setup3D, CITY_GROUPS } from './city.js';
+import { addCityDetail, addHills, setup3D, CITY_GROUPS } from './city.js';
+import { addCityPlaces, placeCard, KINDS as PLACE_KINDS, PLACE_GROUPS } from './places.js';
 import {
   offsetMinutes, zonedToUtc, formatOffset, formatSpan, clock, longDate, shipClock,
   nextClockChange, sun, position,
@@ -282,6 +283,13 @@ map.on('click', (e) => {
   const pad = 12;
   const box = [[e.point.x - pad, e.point.y - pad], [e.point.x + pad, e.point.y + pad]];
   if (map.getLayer('voyage-ship') && map.queryRenderedFeatures(box, { layers: ['voyage-ship', 'voyage-ahead'] })[0]) { voyage.open(); return; }
+  const poiLayers = Object.values(PLACE_GROUPS).flat().filter((id) => map.getLayer(id));
+  const placeHit = poiLayers.length && map.queryRenderedFeatures(box, { layers: poiLayers })[0];
+  if (placeHit) {
+    const [lon, lat] = placeHit.geometry.coordinates;
+    openPanel(placeCard(placeHit.properties, position(lat, lon)));
+    return;
+  }
   const gasHit = shown.terminals && map.getLayer('terminals') && map.queryRenderedFeatures(box, { layers: ['terminals'] })[0];
   const currentHit = shown.currents && map.getLayer('currents-line') && map.queryRenderedFeatures(box, { layers: ['currents-line'] })[0];
   const hits = map.queryRenderedFeatures(box, { layers: PORT_LAYERS });
@@ -354,8 +362,9 @@ const LAYER_GROUPS = {
   marpol: ['zones-marpol-line', 'zones-marpol-labels'],
   loadline: ['zones-ll-fill', 'zones-ll-line', 'zones-ll-labels'],
   ...CITY_GROUPS,
+  ...PLACE_GROUPS,
 };
-const shown = { cityroads: true, cityrail: true, citybuildings: true, citygreen: true, cityplaces: true, roads: true, eca: true, marpol: true, loadline: true, tss: true, seamarks: true, osmwater: true, terminals: true, currents: true, rivers: true, grid: true, weather: false, ...store.get('layers', {}) };
+const shown = { hills: true, ...Object.fromEntries(Object.keys(PLACE_GROUPS).map((g) => [g, true])), cityroads: true, cityrail: true, citybuildings: true, citygreen: true, cityplaces: true, roads: true, eca: true, marpol: true, loadline: true, tss: true, seamarks: true, osmwater: true, terminals: true, currents: true, rivers: true, grid: true, weather: false, ...store.get('layers', {}) };
 let wx = null;
 function applyLayers() {
   for (const [group, ids] of Object.entries(LAYER_GROUPS)) {
@@ -576,6 +585,8 @@ async function addOsmWater() {
     paint: { 'text-color': '#7a2e0b', 'text-halo-color': '#fff6e0', 'text-halo-width': 2.2 },
   });
   addCityDetail(map, { before: 'borders', labelsBefore: PORT_LAYERS[0] });
+  addHills(map, PORT_LAYERS[0]);
+  addCityPlaces(map, PORT_LAYERS[0]).then(applyLayers);
 }
 const OSM_WATER_LAYERS = [
   {
@@ -714,6 +725,8 @@ map.on('load', () => {
   applyLayers();
 });
 const layersBox = $('#layers');
+$('#poi-switches').innerHTML = Object.entries(PLACE_KINDS).map(([k, d]) =>
+  `<label><input type="checkbox" data-layer="poi-${k}"> ${d.icon} ${d.label}</label>`).join('');
 for (const box of layersBox.querySelectorAll('[data-layer]')) {
   box.checked = shown[box.dataset.layer];
   box.onchange = () => { shown[box.dataset.layer] = box.checked; store.set('layers', shown); applyLayers(); };

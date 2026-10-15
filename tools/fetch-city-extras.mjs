@@ -1,0 +1,159 @@
+// Points of interest for chosen cities, into data/city-extras.json, from
+// OpenStreetMap (ODbL) via Overpass, with photos of the places from Wikidata
+// / Wikimedia Commons where OpenStreetMap links them:
+//
+//   traffic signals, petrol pumps, cafés, restaurants, bars and pubs,
+//   nightclubs, hotels (with their star rating), museums and galleries,
+//   places of interest (attractions, viewpoints, heritage, art), golf
+//   courses, snooker and pool halls, shooting ranges, cinemas and theatres.
+//
+//   node tools/fetch-city-extras.mjs
+//
+// Runs on GitHub (see .github/workflows/city.yml). Add a city to CITIES.
+import { readFileSync, writeFileSync } from 'node:fs';
+
+const CITIES = [
+  { name: 'Mumbai', bbox: [18.85, 72.75, 19.35, 73.15] },
+];
+const UA = { 'User-Agent': 'WorldMapCity/1.0 (https://github.com/vaibhavma84-stack/World-Map.-; personal map) node-fetch' };
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const SERVERS = [
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+  'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+];
+
+async function overpass(query) {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    for (const url of SERVERS) {
+      const ctl = new AbortController();
+      const timer = setTimeout(() => ctl.abort(), 200000);
+      try {
+        const res = await fetch(url, { method: 'POST', signal: ctl.signal, headers: { ...UA, 'Content-Type': 'application/x-www-form-urlencoded' }, body: `data=${encodeURIComponent(query)}` });
+        if (!res.ok) throw new Error(`${res.status}`);
+        const j = await res.json();
+        if (j.remark && /error|timed out|runtime/i.test(j.remark)) throw new Error(j.remark);
+        return j.elements || [];
+      } catch (e) {
+        console.warn(`  ${url.split('/')[2]}: ${e.message}`);
+        await sleep(5000);
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+    await sleep(30000 * (attempt + 1));
+  }
+  return null;
+}
+
+// Each element's kind, from its tags (first match wins).
+function kindOf(t) {
+  const sport = t.sport || '';
+  if (t.highway === 'traffic_signals') return 'signals';
+  if (t.amenity === 'fuel') return 'fuel';
+  if (/billiards|snooker|pool/.test(sport) && !/swimming/.test(sport)) return 'snooker';
+  if (/shooting/.test(sport) || t.leisure === 'shooting_ground' || t.shooting) return 'shooting';
+  if (t.leisure === 'golf_course' || /golf/.test(sport)) return 'golf';
+  if (t.amenity === 'nightclub') return 'nightclub';
+  if (t.amenity === 'bar' || t.amenity === 'pub') return 'bar';
+  if (t.amenity === 'cafe') return 'cafe';
+  if (t.amenity === 'restaurant') return 'restaurant';
+  if (t.tourism === 'hotel') return 'hotel';
+  if (t.tourism === 'museum') return 'museum';
+  if (t.tourism === 'gallery') return 'museum';
+  if (t.amenity === 'cinema' || t.amenity === 'theatre') return 'cinema';
+  if (['attraction', 'viewpoint', 'artwork', 'zoo', 'aquarium', 'theme_park'].includes(t.tourism) || t.historic || t.natural === 'beach') return 'interest';
+  return null;
+}
+
+function query([s, w, n, e]) {
+  const b = `(${s},${w},${n},${e})`;
+  return `[out:json][timeout:180];(
+    node["highway"="traffic_signals"]${b};
+    nwr["amenity"~"^(fuel|cafe|restaurant|bar|pub|nightclub|cinema|theatre)$"]${b};
+    nwr["tourism"~"^(hotel|museum|gallery|attraction|viewpoint|artwork|zoo|aquarium|theme_park)$"]${b};
+    nwr["historic"]["name"]${b};
+    nwr["natural"="beach"]["name"]${b};
+    nwr["leisure"~"^(golf_course|shooting_ground)$"]${b};
+    nwr["sport"~"golf|billiards|snooker|pool|shooting"]${b};
+  );out center tags;`;
+}
+
+// Photos: Wikidata's image (P18) for elements linked to Wikidata.
+async function photos(ids) {
+  const out = new Map();
+  for (let i = 0; i < ids.length; i += 50) {
+    const batch = ids.slice(i, i + 50);
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const url = `https://www.wikidata.org/w/api.php?${new URLSearchParams({ action: 'wbgetentities', format: 'json', props: 'claims', ids: batch.join('|') })}`;
+        const j = await (await fetch(url, { headers: UA })).json();
+        for (const [id, e] of Object.entries(j.entities || {})) {
+          const file = e.claims?.P18?.[0]?.mainsnak?.datavalue?.value;
+          if (file) out.set(id, file);
+        }
+        break;
+      } catch (e) {
+        console.warn(`  Wikidata: ${e.message}`);
+        await sleep(5000 * (attempt + 1));
+      }
+    }
+    await sleep(1500);
+  }
+  return out;
+}
+
+const root = new URL('..', import.meta.url);
+let previous = [];
+try { previous = JSON.parse(readFileSync(new URL('data/city-extras.json', root))).features; } catch { /* first run */ }
+
+const features = [];
+for (const city of CITIES) {
+  console.log(city.name);
+  const els = await overpass(query(city.bbox));
+  if (!els) {
+    const kept = previous.filter((f) => f.properties.city === city.name);
+    console.log(`  no answer; keeping ${kept.length} from before`);
+    features.push(...kept);
+    continue;
+  }
+  const found = [];
+  for (const el of els) {
+    const t = el.tags || {};
+    const k = kindOf(t);
+    if (!k) continue;
+    const lat = el.lat ?? el.center?.lat, lon = el.lon ?? el.center?.lon;
+    if (lat == null) continue;
+    const name = t['name:en'] || t.name || '';
+    if (!name && !['signals', 'fuel'].includes(k)) continue;
+    const p = { k, city: city.name };
+    if (name) p.n = name;
+    const stars = parseFloat(t.stars);
+    if (stars) p.s = stars;
+    if (t.cuisine) p.cu = t.cuisine.replace(/_/g, ' ').replace(/;/g, ', ');
+    if (t.opening_hours) p.oh = t.opening_hours;
+    if (t.phone || t['contact:phone']) p.ph = t.phone || t['contact:phone'];
+    if (t.website || t['contact:website']) p.web = t.website || t['contact:website'];
+    if (t.brand) p.br = t.brand;
+    if (t.wikidata) p.wd = t.wikidata;
+    if (t.wikipedia) p.wp = t.wikipedia;
+    if (t.image && /^https?:/.test(t.image)) p.img = t.image;
+    if (t.historic) p.h = t.historic;
+    if (t.tourism) p.tr = t.tourism;
+    found.push({ type: 'Feature', properties: p, geometry: { type: 'Point', coordinates: [Math.round(lon * 1e5) / 1e5, Math.round(lat * 1e5) / 1e5] } });
+  }
+  const wd = [...new Set(found.map((f) => f.properties.wd).filter(Boolean))];
+  const pics = await photos(wd);
+  for (const f of found) {
+    const file = pics.get(f.properties.wd);
+    if (file && !f.properties.img) f.properties.img = `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(file)}?width=480`;
+  }
+  const count = {};
+  for (const f of found) count[f.properties.k] = (count[f.properties.k] || 0) + 1;
+  console.log(`  ${found.length} places: ${JSON.stringify(count)}; ${pics.size} photos`);
+  features.push(...found);
+}
+
+if (!features.length) { console.error('Nothing found; keeping the previous file'); process.exit(1); }
+writeFileSync(new URL('data/city-extras.json', root), JSON.stringify({ type: 'FeatureCollection', features }));
+console.log(`data/city-extras.json: ${features.length} places`);

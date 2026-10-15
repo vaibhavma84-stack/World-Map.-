@@ -11,6 +11,7 @@ export const CITY_GROUPS = {
   cityroads: ['city-road-case', 'city-road', 'city-path', 'city-road-names', 'city-road-refs', 'city-runway'],
   cityrail: ['city-rail', 'city-rail-dash', 'city-metro', 'city-tram', 'city-stations', 'city-station-names'],
   citybuildings: ['city-buildings', 'city-buildings-3d'],
+  hills: ['city-hillshade', 'city-peaks'],
   cityplaces: ['city-places', 'city-poi', 'city-poi-names', 'city-airports', 'city-housenumbers'],
 };
 
@@ -197,24 +198,55 @@ export function addCityDetail(map, { before, labelsBefore }) {
   }, labelsBefore);
 }
 
+// Hills and mountains: shading from the open terrain tiles (online), and
+// named peaks with their height from OpenStreetMap.
+const DEM = {
+  type: 'raster-dem', encoding: 'terrarium', tileSize: 256, maxzoom: 14,
+  tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],
+  attribution: 'Terrain: Mapzen / AWS Open Data',
+};
+function ensureDem(map) {
+  if (!map.getSource('dem')) map.addSource('dem', DEM);
+}
+function peakImage() {
+  const s = 2, w = 14 * s, h = 12 * s;
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const g = c.getContext('2d');
+  g.beginPath(); g.moveTo(w / 2, s); g.lineTo(w - s, h - s); g.lineTo(s, h - s); g.closePath();
+  g.fillStyle = '#7a5230'; g.strokeStyle = '#ffffff'; g.lineWidth = 1.5 * s; g.stroke(); g.fill();
+  return g.getImageData(0, 0, w, h);
+}
+export function addHills(map, labelsBefore) {
+  ensureDem(map);
+  map.addLayer({
+    id: 'city-hillshade', type: 'hillshade', source: 'dem', minzoom: 5,
+    paint: { 'hillshade-exaggeration': 0.35, 'hillshade-shadow-color': '#5c5040', 'hillshade-highlight-color': '#ffffff', 'hillshade-accent-color': '#5c5040' },
+  }, 'osm-water');
+  map.addImage('peak', peakImage(), { pixelRatio: 2 });
+  map.addLayer({
+    id: 'city-peaks', type: 'symbol', source: 'osm', 'source-layer': 'mountain_peak', minzoom: 7,
+    filter: ['has', 'name'],
+    layout: {
+      'icon-image': 'peak', 'symbol-sort-key': ['coalesce', ['get', 'rank'], 99],
+      'text-field': ['format', ['coalesce', ['get', 'name_en'], ['get', 'name']], {}, '\n', {},
+        ['case', ['has', 'ele'], ['concat', ['to-string', ['get', 'ele']], ' m'], ''], { 'font-scale': 0.85 }],
+      'text-font': ['OpenSans-Semibold'], 'text-size': 11, 'text-anchor': 'top', 'text-offset': [0, 0.7], 'text-optional': true,
+    },
+    paint: { 'text-color': '#6b4423', 'text-halo-color': 'rgba(255,255,255,0.9)', 'text-halo-width': 1.5 },
+  }, labelsBefore);
+}
+
 // 3D: tilt and turn the map, raise the buildings, add hills. Terrain from the
 // open terrain tiles on AWS (Mapzen/Tilezen), online only.
 export function setup3D(map, button, onChange) {
   let on = false;
-  let demAdded = false;
   const set = (value) => {
     on = value;
     button.setAttribute('aria-pressed', String(on));
     button.classList.toggle('active', on);
     if (on) {
-      if (!demAdded) {
-        map.addSource('dem', {
-          type: 'raster-dem', encoding: 'terrarium', tileSize: 256, maxzoom: 14,
-          tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],
-          attribution: 'Terrain: Mapzen / AWS Open Data',
-        });
-        demAdded = true;
-      }
+      ensureDem(map);
       if (navigator.onLine !== false) map.setTerrain({ source: 'dem', exaggeration: 1.5 });
       map.dragRotate.enable();
       map.touchZoomRotate.enableRotation();
