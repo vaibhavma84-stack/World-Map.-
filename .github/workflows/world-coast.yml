@@ -9,6 +9,7 @@ on:
   push:
     paths:
       - 'tools/build-world-coast.py'
+      - 'tools/check-world-coast.py'
 
 permissions:
   contents: write
@@ -31,7 +32,7 @@ jobs:
 
       - name: Tools
         run: |
-          pip install shapely==2.2.0 pyogrio==0.13.0 mapbox-vector-tile==2.2.0 numpy
+          pip install shapely==2.2.0 pyogrio==0.13.0 mapbox-vector-tile==2.2.0 numpy pmtiles==3.4.1
           sudo apt-get update -q && sudo apt-get install -y -q build-essential libsqlite3-dev zlib1g-dev
           git clone --depth 1 --branch 2.79.0 https://github.com/felt/tippecanoe.git /tmp/tippecanoe
           make -C /tmp/tippecanoe -j4 >/dev/null
@@ -44,12 +45,18 @@ jobs:
           python3 tools/build-world-coast.py > tools/.cache/land.geojsonl
           ls -lh tools/.cache/land.geojsonl
 
+      - name: Check the land polygons and coloured pieces
+        run: |
+          python3 tools/check-world-coast.py tools/.cache/land-polygons-split-4326/land_polygons.shp || true
+          python3 tools/check-world-coast.py tools/.cache/land.geojsonl
+
       - name: Make the map file
         run: |
           tippecanoe -o tools/.cache/land.pmtiles -l land -Z5 -z12 \
             -P --no-tile-size-limit --no-feature-limit --detect-shared-borders \
             --simplification=2 --force tools/.cache/land.geojsonl
           ls -lh tools/.cache/land.pmtiles
+          python3 tools/check-world-coast.py - tools/.cache/land.pmtiles
 
       - name: Attach to the release
         env:
