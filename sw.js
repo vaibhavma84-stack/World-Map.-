@@ -139,7 +139,7 @@ async function worldPiece(request) {
 
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;
-  if (new URL(e.request.url).pathname.endsWith('/land.pmtiles')) { e.respondWith(worldPiece(e.request)); return; }
+  if (new URL(e.request.url).pathname.endsWith('.pmtiles')) { e.respondWith(worldPiece(e.request)); return; }
   if (new URL(e.request.url).host === 'tiles.openfreemap.org') { e.respondWith(ofmTile(e.request)); return; }
   const url = new URL(e.request.url);
   if (url.origin === location.origin && url.pathname.includes('/data/coast/') && !url.pathname.endsWith('index.json')) {

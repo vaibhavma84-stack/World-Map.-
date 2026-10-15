@@ -1,0 +1,62 @@
+name: Rivers and tributaries
+
+# Builds the world's rivers and tributaries (HydroRIVERS) into two map files
+# on the 'rivers' release: rivers.pmtiles (catchments of 1,000 km² and more,
+# for Android) and rivers-lite.pmtiles (5,000 km² and more, for the iPhone
+# site, which has a size limit). Run by hand; the river network rarely changes.
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - tools/build-rivers.py
+      - .github/workflows/rivers.yml
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Tools
+        run: |
+          pip install shapely==2.2.0 pyogrio==0.13.0
+          sudo apt-get update -q && sudo apt-get install -y -q build-essential libsqlite3-dev zlib1g-dev
+          git clone --depth 1 --branch 2.79.0 https://github.com/felt/tippecanoe.git /tmp/tippecanoe
+          make -C /tmp/tippecanoe -j4 >/dev/null
+          sudo make -C /tmp/tippecanoe install >/dev/null
+      - name: Download HydroRIVERS
+        run: |
+          mkdir -p /tmp/hr && cd /tmp/hr
+          curl -sSfL --retry 3 -o hr.zip https://data.hydrosheds.org/file/HydroRIVERS/HydroRIVERS_v10_shp.zip
+          unzip -q hr.zip && find . -name '*.shp' && ls -lh hr.zip
+      - name: Build
+        run: |
+          shp=$(find /tmp/hr -name 'HydroRIVERS_v10.shp' | head -1)
+          for v in "rivers 1000" "rivers-lite 5000"; do
+            set -- $v
+            python3 tools/build-rivers.py "$shp" $2 > /tmp/$1.geojsonl
+            tippecanoe -o /tmp/$1.pmtiles -l rivers -Z2 -z10 -P --no-tile-size-limit --no-feature-limit \
+              --simplification=2 --force /tmp/$1.geojsonl
+            ls -lh /tmp/$1.pmtiles
+          done
+      - name: Attach to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view rivers >/dev/null 2>&1 || \
+            gh release create rivers --title "Rivers data" --target "${{ github.sha }}" \
+              --notes "World rivers and tributaries from HydroRIVERS (HydroSHEDS, WWF/USGS), used by the app builds. Not an app release."
+          gh release upload rivers /tmp/rivers.pmtiles /tmp/rivers-lite.pmtiles --clobber
+      - name: Rebuild the apps
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run android.yml --ref "${{ github.ref_name }}"
+          gh workflow run pages.yml --ref "${{ github.ref_name }}"

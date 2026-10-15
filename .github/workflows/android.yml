@@ -46,6 +46,7 @@ jobs:
           cp -r css js data fonts vendor icons "$A/"
           # The world coastline file, kept on the 'world-coast' release.
           gh release download world-coast -p land.pmtiles -D "$A/data" || echo "No world coastline file yet"
+          gh release download rivers -p rivers.pmtiles -D "$A/data" || echo "No rivers file yet"
           du -sh "$A"
 
       - name: Build
