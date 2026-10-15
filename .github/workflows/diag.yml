@@ -4,6 +4,10 @@ name: Check the published app
 # detailed world coastline loads. Run from the Actions tab.
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - tools/diag-site.mjs
+      - .github/workflows/diag.yml
 
 jobs:
   check:
