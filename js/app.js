@@ -347,11 +347,12 @@ const LAYER_GROUPS = {
   osmwater: ['osm-water', 'osm-water-edge', 'osm-waterway'],
   rivers: ['rivers-0', 'rivers-6', 'rivers-9', 'river-names-0', 'river-names-5', 'river-names-9', 'lakes', 'lake-names'],
   grid: ['grid'],
+  roads: ['roads-3', 'roads-2', 'roads-1-case', 'roads-1', 'osm-roads-case', 'osm-roads', 'osm-road-refs', 'cities', 'city-names'],
   eca: ['zones-eca-fill', 'zones-eca-line', 'zones-eca-labels'],
   marpol: ['zones-marpol-line', 'zones-marpol-labels'],
   loadline: ['zones-ll-fill', 'zones-ll-line', 'zones-ll-labels'],
 };
-const shown = { eca: true, marpol: true, loadline: true, tss: true, seamarks: true, osmwater: true, terminals: true, currents: true, rivers: true, grid: true, weather: false, ...store.get('layers', {}) };
+const shown = { roads: true, eca: true, marpol: true, loadline: true, tss: true, seamarks: true, osmwater: true, terminals: true, currents: true, rivers: true, grid: true, weather: false, ...store.get('layers', {}) };
 let wx = null;
 function applyLayers() {
   for (const [group, ids] of Object.entries(LAYER_GROUPS)) {
@@ -407,6 +408,51 @@ async function addTss() {
   applyLayers();
 }
 
+// Major roads and cities, offline (Natural Earth): motorways from zoom 3.5,
+// main roads from 5.5, the rest from 6.5; cities by size. Closer in, the
+// OpenStreetMap roads with their numbers (NH 48, E40…) take over when online.
+const ROAD = { 1: '#d9622b', 2: '#e39a3b', 3: '#c8a46e' };
+async function addRoads() {
+  const [roads, cities] = await Promise.all(['roads', 'cities'].map((n) =>
+    fetch(`data/${n}.json`).then((r) => (r.ok ? r.json() : null)).catch(() => null)));
+  if (roads) {
+    map.addSource('roads', { type: 'geojson', data: roads, tolerance: 0.6 });
+    const road = (id, k, min, width, extra = {}) => map.addLayer({
+      id, type: 'line', source: 'roads', minzoom: min, maxzoom: 10.5,
+      filter: ['all', ['==', ['get', 'k'], k], ['<=', ['get', 'z'], ['+', ['zoom'], 2.5]]],
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-color': ROAD[k], 'line-width': width, ...extra },
+    }, 'borders');
+    road('roads-3', 3, 6.5, zoomed([[6.5, 0.4], [10, 1.2]]), { 'line-opacity': 0.8 });
+    road('roads-2', 2, 5.5, zoomed([[5.5, 0.7], [10, 1.8]]));
+    road('roads-1-case', 1, 3.5, zoomed([[3.5, 1.8], [10, 4.4]]));
+    map.setPaintProperty('roads-1-case', 'line-color', 'rgba(255,255,255,0.85)');
+    road('roads-1', 1, 3.5, zoomed([[3.5, 1.1], [10, 2.8]]));
+  }
+  if (cities) {
+    map.addSource('cities', { type: 'geojson', data: cities });
+    const visible = ['<=', ['get', 'z'], ['+', ['zoom'], 1]];
+    map.addLayer({
+      id: 'cities', type: 'circle', source: 'cities', minzoom: 2, filter: visible,
+      paint: {
+        'circle-radius': ['interpolate', ['linear'], ['get', 'p'], 100000, 2.2, 1000000, 3.2, 10000000, 4.5],
+        'circle-color': '#ffffff', 'circle-stroke-color': '#3a3a3a', 'circle-stroke-width': ['case', ['==', ['get', 'cap'], 1], 2, 1.2],
+      },
+    }, PORT_LAYERS[0]);
+    map.addLayer({
+      id: 'city-names', type: 'symbol', source: 'cities', minzoom: 2, filter: visible,
+      layout: {
+        'text-field': ['get', 'n'], 'text-font': ['OpenSans-Semibold'],
+        'text-size': ['interpolate', ['linear'], ['get', 'p'], 100000, 11, 1000000, 12.5, 10000000, 14],
+        'text-anchor': 'top', 'text-offset': [0, 0.5], 'text-max-width': 8, 'symbol-sort-key': ['-', 0, ['get', 'p']],
+        'text-optional': true,
+      },
+      paint: { 'text-color': '#222831', 'text-halo-color': 'rgba(255,255,255,0.9)', 'text-halo-width': 1.5 },
+    }, PORT_LAYERS[0]);
+  }
+  applyLayers();
+}
+
 // The great ocean currents: warm in red, cold in blue, arrows the way they set.
 function addCurrents() {
   map.addImage('flow-warm', flowImage('#d1495b'), { pixelRatio: 2 });
@@ -444,6 +490,27 @@ function addCurrents() {
 function addOsmWater() {
   map.addSource('osm', { type: 'vector', url: 'https://tiles.openfreemap.org/planet' });
   for (const layer of OSM_WATER_LAYERS) map.addLayer(layer, 'rivers-0');
+  const main = ['match', ['get', 'class'], ['motorway', 'trunk', 'primary'], true, false];
+  const colour = ['match', ['get', 'class'], 'motorway', ROAD[1], 'trunk', ROAD[1], ROAD[2]];
+  map.addLayer({
+    id: 'osm-roads-case', type: 'line', source: 'osm', 'source-layer': 'transportation', minzoom: 9, filter: main,
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': 'rgba(255,255,255,0.85)', 'line-width': zoomed([[9, 2.2], [14, 7]]) },
+  }, 'borders');
+  map.addLayer({
+    id: 'osm-roads', type: 'line', source: 'osm', 'source-layer': 'transportation', minzoom: 9, filter: main,
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': colour, 'line-width': zoomed([[9, 1.3], [14, 4.5]]) },
+  }, 'borders');
+  map.addLayer({
+    id: 'osm-road-refs', type: 'symbol', source: 'osm', 'source-layer': 'transportation_name', minzoom: 9,
+    filter: ['all', main, ['has', 'ref']],
+    layout: {
+      'symbol-placement': 'line', 'symbol-spacing': 400, 'text-field': ['get', 'ref'], 'text-font': ['OpenSans-Bold'],
+      'text-size': 10.5, 'text-rotation-alignment': 'viewport', 'text-padding': 30,
+    },
+    paint: { 'text-color': '#7a2e0b', 'text-halo-color': '#fff6e0', 'text-halo-width': 2.2 },
+  });
 }
 const OSM_WATER_LAYERS = [
   {
@@ -536,6 +603,7 @@ map.on('load', () => {
   addOsmWater();
   addTerminals();
   addTss();
+  addRoads();
   addZones(map, 'borders').then(applyLayers);
   addCurrents();
   wx = setupWeather(map, {

@@ -111,4 +111,10 @@ ok(position(51.9, 4.4833) === '51°54.0′N 004°29.0′E', 'position format');
   ok(at(10, 38, '2026-01-10').eca.some((e) => /Mediterranean/.test(e.name)), 'Mediterranean SOx ECA');
 }
 
+// Roads and cities: well-formed, and the main Indian port cities there.
+const roads = json('roads');
+ok(roads.features.length > 10000 && roads.features.every((f) => [1, 2, 3].includes(f.properties.k)), 'roads well-formed');
+const cityNames = new Set(json('cities').features.map((f) => f.properties.n));
+ok(['Mumbai', 'Chennai', 'Kolkata', 'Delhi', 'Mangaluru'].every((n) => cityNames.has(n)), 'Indian port cities present');
+
 console.log(`${checks} checks passed`);
