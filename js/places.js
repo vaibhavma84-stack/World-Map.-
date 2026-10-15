@@ -8,8 +8,9 @@ export const KINDS = {
   fuel: { label: 'Petrol pumps', icon: '⛽', colour: '#555555', zoom: 13 },
   cafe: { label: 'Cafés', icon: '☕', colour: '#8d5524', zoom: 14 },
   restaurant: { label: 'Restaurants (Michelin links highlighted)', icon: '🍽️', colour: '#c0392b', zoom: 14 },
-  bar: { label: 'Bars and pubs', icon: '🍺', colour: '#b7791f', zoom: 14 },
+  bar: { label: 'Bars, pubs and breweries', icon: '🍺', colour: '#b7791f', zoom: 14 },
   nightclub: { label: 'Nightclubs & lounges', icon: '🪩', colour: '#7b2cbf', zoom: 13 },
+  club: { label: "Clubs and gymkhanas", icon: '♣️', colour: '#22543d', zoom: 12 },
   hotel: { label: 'Hotels (5★ highlighted)', icon: '🏨', colour: '#2c7a7b', zoom: 13 },
   museum: { label: 'Museums and galleries', icon: '🏛️', colour: '#5b4b8a', zoom: 12 },
   interest: { label: 'Places of interest and heritage', icon: '📍', colour: '#d35400', zoom: 12 },
@@ -52,8 +53,9 @@ const MICHELIN = [
   [/^Trishna\b/i, 'Trishna London, named after and inspired by this Mumbai restaurant, won a Michelin star.'],
 ];
 
+const BAR = /\bbar\b|\bpub\b|brew|taproom|tavern|\bwine|\bbeer|permit room/i;
 const NIGHTLIFE = /lounge|night ?club|disco|\bclub\b|\bsocial\b|\bnights?\b|supper club/i;
-const NOT_NIGHTLIFE = /sports|golf|yacht|kennel|gymkhana|cricket|swimming|^club restaurant$|cafe terrace/i;
+const NOT_NIGHTLIFE = /sports|golf|yacht|kennel|gymkhana|cricket|swimming|brew|\bbar\b|^club restaurant$|cafe terrace/i;
 
 export async function addCityPlaces(map, labelsBefore) {
   const data = await fetch('data/city-extras.json').then((r) => (r.ok ? r.json() : null)).catch(() => null);
@@ -66,6 +68,10 @@ export async function addCityPlaces(map, labelsBefore) {
       if (m) p.mi = m[1];
     }
     if (p.s >= 5 || p.lux) p.gold = 1;
+    // Bars listed as restaurants, and clubs listed as something else (data
+    // gathered before tools/fetch-city-extras.mjs sorted them itself).
+    if (['restaurant', 'cafe'].includes(p.k) && !p.mi && BAR.test(p.n || '')) { p.was = p.k; p.k = 'bar'; }
+    if (['snooker', 'interest'].includes(p.k) && /gymkhana|\bclub\b/i.test(p.n || '')) { p.was = p.k; p.k = 'club'; }
     // Few places are tagged as nightclubs in OpenStreetMap; lounges and
     // party bars are tagged as bars or restaurants. Shown with the clubs.
     if (['bar', 'restaurant', 'cafe', 'snooker'].includes(p.k) && NIGHTLIFE.test(p.n || '') && !NOT_NIGHTLIFE.test(p.n || '')) {
@@ -119,7 +125,8 @@ export function placeCard(p, position) {
   const d = KINDS[p.k] || { label: 'Place', icon: '📍' };
   const stars = p.s ? `<div class="big">${'★'.repeat(Math.round(p.s))}<span class="note"> ${p.s}-star</span></div>`
     : p.lux ? '<div class="big">★★★★★<span class="note"> luxury (5-star class); rating not recorded in OpenStreetMap</span></div>' : '';
-  const night = p.was ? `<div class="note">Lounge or party bar (OpenStreetMap lists it as a ${esc(p.was === 'snooker' ? 'snooker hall' : p.was)}).</div>` : '';
+  const was = { snooker: 'snooker hall', interest: 'place of interest' }[p.was] || p.was;
+  const night = p.was ? `<div class="note">${{ nightclub: 'Lounge or party bar', bar: 'Bar', club: 'Club' }[p.k] || 'Shown here'} (OpenStreetMap lists it as a ${esc(was)}).</div>` : '';
   const michelin = p.mi ? `<div class="big">🏵️ Michelin link</div><div class="note">${esc(p.mi)}</div>` : '';
   const rows = [
     ['Cuisine', p.cu], ['Brand', p.br], ['Open', p.oh], ['Phone', p.ph && `<a href="tel:${esc(p.ph)}">${esc(p.ph)}</a>`],

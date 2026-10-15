@@ -3,7 +3,7 @@
 // / Wikimedia Commons where OpenStreetMap links them:
 //
 //   traffic signals, petrol pumps, cafés, restaurants, bars and pubs,
-//   nightclubs, hotels (with their star rating), museums and galleries,
+//   nightclubs, members' clubs and gymkhanas, hotels (with their star rating), museums and galleries,
 //   places of interest (attractions, viewpoints, heritage, art), golf
 //   courses, snooker and pool halls, shooting ranges, cinemas and theatres.
 //
@@ -55,7 +55,13 @@ function kindOf(t) {
   if (/shooting/.test(sport) || t.leisure === 'shooting_ground' || t.shooting) return 'shooting';
   if (t.leisure === 'golf_course' || /golf/.test(sport)) return 'golf';
   if (t.amenity === 'nightclub') return 'nightclub';
-  if (t.amenity === 'bar' || t.amenity === 'pub') return 'bar';
+  // Members' clubs and gymkhanas (golf clubs stay with golf, above).
+  const name = t['name:en'] || t.name || '';
+  if (t.club || ['social_club', 'social_centre'].includes(t.amenity) || t.leisure === 'sports_club'
+    || (/gymkhana|\bclub\b/i.test(name) && (t.leisure || t.sport || t.building || t.amenity === 'community_centre'))) return 'club';
+  if (t.amenity === 'bar' || t.amenity === 'pub' || t.amenity === 'biergarten') return 'bar';
+  // Bars listed as restaurants ("bar & restaurant", breweries, permit rooms).
+  if (['restaurant', 'cafe'].includes(t.amenity) && (t.bar === 'yes' || /\bbar\b|\bpub\b|brew|taproom|tavern|\bwine|\bbeer|permit room/i.test(name))) return 'bar';
   if (t.amenity === 'cafe') return 'cafe';
   if (t.amenity === 'restaurant') return 'restaurant';
   if (t.tourism === 'hotel') return 'hotel';
@@ -70,7 +76,11 @@ function query([s, w, n, e]) {
   const b = `(${s},${w},${n},${e})`;
   return `[out:json][timeout:180];(
     node["highway"="traffic_signals"]${b};
-    nwr["amenity"~"^(fuel|cafe|restaurant|bar|pub|nightclub|cinema|theatre)$"]${b};
+    nwr["amenity"~"^(fuel|cafe|restaurant|bar|pub|biergarten|nightclub|cinema|theatre|social_club|social_centre)$"]${b};
+    nwr["club"]["name"]${b};
+    nwr["leisure"="sports_club"]["name"]${b};
+    nwr["name"~"[Gg]ymkhana|[Cc]lub"]["leisure"]${b};
+    nwr["name"~"[Gg]ymkhana|[Cc]lub"]["building"]${b};
     nwr["tourism"~"^(hotel|museum|gallery|attraction|viewpoint|artwork|zoo|aquarium|theme_park)$"]${b};
     nwr["historic"]["name"]${b};
     nwr["natural"="beach"]["name"]${b};
