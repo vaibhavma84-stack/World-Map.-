@@ -34,8 +34,16 @@ jobs:
       - name: Download HydroRIVERS
         run: |
           mkdir -p /tmp/hr && cd /tmp/hr
-          curl -sSfL --retry 3 -o hr.zip https://data.hydrosheds.org/file/HydroRIVERS/HydroRIVERS_v10_shp.zip
-          unzip -q hr.zip && find . -name '*.shp' && ls -lh hr.zip
+          # The server turns away requests that do not look like a browser.
+          get() { curl -sSfL --retry 3 -A "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36" \
+                    -e "https://www.hydrosheds.org/products/hydrorivers" -o "$1" "$2"; }
+          if get hr.zip https://data.hydrosheds.org/file/HydroRIVERS/HydroRIVERS_v10_shp.zip; then
+            unzip -q hr.zip
+          else
+            curl -sSIL -A "Mozilla/5.0" https://data.hydrosheds.org/file/HydroRIVERS/HydroRIVERS_v10_shp.zip | head -20 || true
+            exit 1
+          fi
+          find . -name '*.shp' && ls -lh hr.zip
       - name: Build
         run: |
           shp=$(find /tmp/hr -name 'HydroRIVERS_v10.shp' | head -1)
