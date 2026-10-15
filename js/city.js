@@ -201,8 +201,8 @@ export function addCityDetail(map, { before, labelsBefore }) {
 // Hills and mountains: shading from the open terrain tiles (online), and
 // named peaks with their height from OpenStreetMap.
 const DEM = {
-  type: 'raster-dem', encoding: 'terrarium', tileSize: 256, maxzoom: 14,
-  tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],
+  type: 'raster-dem', encoding: 'terrarium', tileSize: 256, maxzoom: 13,
+  tiles: ['dem://{z}/{x}/{y}'], // through the app's store (js/app.js)
   attribution: 'Terrain: Mapzen / AWS Open Data',
 };
 function ensureDem(map) {

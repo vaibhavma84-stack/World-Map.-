@@ -51,6 +51,7 @@
 
   <div id="layers" class="layers" hidden>
     <button id="save-area" type="button" class="primary wide">Save this area for use at sea</button>
+    <button type="button" class="secondary wide" data-city="Mumbai">Download Mumbai map for use at sea</button>
     <p class="layers-head">City detail <small>zoom in · online, kept once seen or saved</small></p>
     <label><input type="checkbox" data-layer="cityroads"> Every street, with names</label>
     <label><input type="checkbox" data-layer="cityrail"> Railways, metro and stations</label>
@@ -125,6 +126,8 @@
       <div class="save-coast">
         <button id="save-all" type="button" class="primary wide" hidden>Download everything for use at sea</button>
         <p class="hint" id="save-all-hint" hidden>The detailed coast of the whole world and every harbour, for use with no signal. Works on mobile data as well as Wi-Fi; if the signal drops, tap again and it carries on.</p>
+        <button type="button" class="secondary wide" data-city="Mumbai">Download Mumbai map for use at sea</button>
+        <p class="hint">Mumbai, Thane and Navi Mumbai in full: every street, railway and metro, buildings, places and hills. Tap again any time to update it.</p>
         <button id="save-coast" type="button" class="secondary">Save all harbour coastlines</button>
         <p class="hint">Detailed harbour coastlines (with rivers and docks) show from zoom 8. Each area is kept once viewed; this saves them all for use at sea.</p>
         <button id="save-world" type="button" class="secondary" hidden>Save the whole world's coastline</button>

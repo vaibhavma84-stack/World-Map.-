@@ -45,28 +45,33 @@ async function visit(page, name, label, zoom) {
   }
 }
 
-for (const [name, engine] of [['webkit', webkit], ['chromium', chromium]]) {
-  console.log(`\n===== ${name}`);
-  const browser = await engine.launch();
+for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) {
   for (const sw of ['block', 'allow']) {
-    const ctx = await browser.newContext({ viewport: { width: 420, height: 860 }, deviceScaleFactor: 1, serviceWorkers: sw });
-    const page = await ctx.newPage();
-    page.on('crash', () => console.log('  PAGE CRASHED'));
-    page.on('console', (m) => { const t = m.text(); if (!/GL Driver|WebGL|vertices/.test(t)) console.log(`  console.${m.type()}: ${t.slice(0, 300)}`); });
-    page.on('pageerror', (e) => console.log(`  pageerror: ${e.message}`));
-    page.on('requestfailed', (r) => { if (/openfreemap/.test(r.url())) console.log(`  FAILED ${r.url()} ${r.failure()?.errorText}`); });
-    const seen = {};
-    page.on('response', (r) => {
-      const m = r.url().match(/openfreemap\.org\/.*?\/(\d+)\/\d+\/\d+\.pbf/);
-      if (!m) return;
-      const k = `z${m[1]} ${r.status()}`;
-      seen[k] = (seen[k] || 0) + 1;
-    });
     for (const zoom of [14, 16]) {
-      await visit(page, name, `sw-${sw}`, zoom);
-      console.log(`  tiles: ${JSON.stringify(seen)}`);
+      console.log(`\n===== ${name} sw-${sw}`);
+      const browser = await engine.launch();
+      try {
+        const ctx = await browser.newContext({ viewport: { width: 360, height: 640 }, deviceScaleFactor: 1, serviceWorkers: sw });
+        const page = await ctx.newPage();
+        page.on('crash', () => console.log('  PAGE CRASHED'));
+        page.on('close', () => console.log('  page closed'));
+        page.on('console', (m) => { const t = m.text(); if (!/GL Driver|vertices/.test(t)) console.log(`  console.${m.type()}: ${t.slice(0, 300)}`); });
+        page.on('pageerror', (e) => console.log(`  pageerror: ${e.message}`));
+        page.on('requestfailed', (r) => { if (/openfreemap/.test(r.url())) console.log(`  FAILED ${r.url()} ${r.failure()?.errorText}`); });
+        const seen = {};
+        page.on('response', (r) => {
+          const m = r.url().match(/openfreemap\.org\/.*?\/(\d+)\/\d+\/\d+\.pbf/);
+          if (!m) return;
+          const k = `z${m[1]} ${r.status()} ${r.headers()['content-length'] || ''}`.trim();
+          seen[`z${m[1]} ${r.status()}`] = (seen[`z${m[1]} ${r.status()}`] || 0) + 1;
+          if (/^z1[34]/.test(k) && seen[`z${m[1]} ${r.status()}`] <= 2) console.log(`  tile ${r.url()} ${k}`);
+        });
+        await visit(page, name, `sw-${sw}`, zoom);
+        console.log(`  tiles: ${JSON.stringify(seen)}`);
+      } catch (e) {
+        console.log(`  ERROR: ${e.message.split('\n')[0]}`);
+      }
+      await browser.close().catch(() => {});
     }
-    await ctx.close();
   }
-  await browser.close();
 }

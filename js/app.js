@@ -548,6 +548,30 @@ maplibregl.addProtocol('ofm', async (params, abort) => {
   }
   return { data };
 });
+// Terrain (hill shading and the 3D ground), kept the same way so a saved
+// city has its hills at sea too.
+const DEM_URL = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png';
+const demKey = (z, x, y) => `https://dem.cache/${z}/${x}/${y}.png`;
+async function demFetch(z, x, y, signal) {
+  const res = await fetch(DEM_URL.replace('{z}', z).replace('{x}', x).replace('{y}', y), { signal, cache: 'no-store' });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.arrayBuffer();
+}
+maplibregl.addProtocol('dem', async (params, abort) => {
+  const [z, x, y] = params.url.slice('dem://'.length).split('/').map(Number);
+  const key = demKey(z, x, y);
+  if (hasCaches) {
+    for (const name of [OFM_SAVED, OFM_SEEN]) {
+      try { const hit = await (await caches.open(name)).match(key); if (hit) return { data: await hit.arrayBuffer() }; } catch { /* go on */ }
+    }
+  }
+  const data = await demFetch(z, x, y, abort.signal);
+  if (hasCaches) {
+    const copy = data.slice(0);
+    caches.open(OFM_SEEN).then((c) => c.put(key, new Response(copy))).catch(() => {});
+  }
+  return { data };
+});
 // Keep the everyday store to its most recent 30,000 tiles.
 if (hasCaches) setTimeout(async () => {
   try {
@@ -1377,35 +1401,94 @@ async function saveArea(button) {
   const mb = Math.max(1, Math.round(tiles.length * 0.03));
   const what = detail ? 'the full city detail: every street, railways, metro and stations, buildings, parks and places' : 'detailed rivers, docks and main roads (zoom in further to save the full city detail too)';
   if (!confirm(`Save this area for use at sea: ${what}. About ${mb} MB (${tiles.length.toLocaleString()} pieces), on mobile data or Wi-Fi. Keep the app open until it says done.`)) return;
+  const r = await saveTiles(tiles.map((t) => ['ofm', ...t]), button, 'Saving area…');
+  button.textContent = r.failed ? `Saved, but ${r.failed} pieces failed — tap to try again` : 'Area saved for use at sea ✓';
+  if (!r.failed) setTimeout(() => { button.textContent = 'Save this area for use at sea'; }, 6000);
+}
+// Fetch and keep map pieces ([kind, z, x, y], kind 'ofm' or 'dem'), six at a
+// time with retries. With fresh, every piece is fetched again (an update);
+// otherwise pieces already kept are skipped.
+async function saveTiles(tiles, button, label, fresh = false) {
   navigator.storage?.persist?.().catch(() => {});
+  const old = button.textContent;
   button.disabled = true;
   const cache = await caches.open(OFM_SAVED);
   let done = 0, failed = 0, bytes = 0;
   const queue = [...tiles];
   const worker = async () => {
     while (queue.length) {
-      const [z, x, y] = queue.shift();
-      const key = ofmKey(z, x, y);
-      let ok = !!(await cache.match(key));
+      const [kind, z, x, y] = queue.shift();
+      const key = kind === 'dem' ? demKey(z, x, y) : ofmKey(z, x, y);
+      let ok = !fresh && !!(await cache.match(key));
       for (let attempt = 0; !ok && attempt < 4; attempt++) {
         try {
-          const data = await ofmFetch(z, x, y);
+          const data = await (kind === 'dem' ? demFetch : ofmFetch)(z, x, y);
           await cache.put(key, new Response(data));
+          if (fresh) caches.open(OFM_SEEN).then((c) => c.delete(key)).catch(() => {});
           bytes += data.byteLength;
           ok = true;
         } catch { await new Promise((w) => setTimeout(w, 1500 * (attempt + 1))); }
       }
       if (!ok) failed++;
       done++;
-      if (done % 25 === 0 || !queue.length) button.textContent = `Saving area… ${done.toLocaleString()} / ${tiles.length.toLocaleString()} (${Math.round(bytes / 1e6)} MB)`;
+      if (done % 10 === 0 || !queue.length) button.textContent = `${label} ${done.toLocaleString()} / ${tiles.length.toLocaleString()} (${Math.round(bytes / 1e6)} MB)`;
     }
   };
   await Promise.all(Array.from({ length: 6 }, worker));
-  button.textContent = failed ? `Saved, but ${failed} pieces failed — tap to try again` : 'Area saved for use at sea ✓';
   button.disabled = false;
-  if (!failed) setTimeout(() => { button.textContent = 'Save this area for use at sea'; }, 6000);
+  button.textContent = old;
   showSavedAreas();
+  return { failed, bytes };
 }
+
+// Whole cities, saved or brought up to date in one go: every street,
+// railway, metro line, building and place, and the hills, zoom 6 to 14.
+const CITY_PACKS = [
+  { name: 'Mumbai', west: 72.75, south: 18.85, east: 73.25, north: 19.45 },
+];
+const packTiles = (c) => {
+  const b = { getWest: () => c.west, getEast: () => c.east, getNorth: () => c.north, getSouth: () => c.south };
+  const out = [];
+  for (let z = 6; z <= 14; z++) {
+    const [x0, x1, y0, y1] = tileRange(b, z);
+    for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) {
+      out.push(['ofm', z, x, y]);
+      if (z <= 13) out.push(['dem', z, x, y]);
+    }
+  }
+  return out;
+};
+const packDate = (c) => { try { return localStorage.getItem(`wm.city.${c.name}`); } catch { return null; } };
+function showCityPacks() {
+  for (const c of CITY_PACKS) {
+    const when = packDate(c);
+    for (const b of document.querySelectorAll(`[data-city="${c.name}"]`)) {
+      b.textContent = when ? `Update ${c.name} map (saved ${new Date(when).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })})` : `Download ${c.name} map for use at sea`;
+    }
+  }
+}
+async function saveCity(c, button) {
+  if (!hasCaches || !ofmTemplate) { alert('Downloading a city needs a connection.'); return; }
+  const tiles = packTiles(c);
+  const update = !!packDate(c);
+  const mb = Math.round(tiles.length * 0.06);
+  if (!confirm(`${update ? 'Update' : 'Download'} the whole ${c.name} map: every street with names, railways, metro and stations, buildings (3D), parks, places and the hills. About ${mb} MB (${tiles.length.toLocaleString()} pieces), on mobile data or Wi-Fi.${update ? ' Every piece is fetched again, so it has the latest changes.' : ''} Keep the app open until it says done.`)) return;
+  const r = await saveTiles(tiles, button, `${update ? 'Updating' : 'Saving'} ${c.name}…`, true);
+  // The app's own data (places to go, photos list) comes with app updates.
+  try { (await navigator.serviceWorker?.getRegistration())?.update(); } catch { /* fine */ }
+  if (r.failed) {
+    button.textContent = `${r.failed} pieces failed — tap to try again`;
+    return;
+  }
+  try { localStorage.setItem(`wm.city.${c.name}`, new Date().toISOString()); } catch { /* full */ }
+  button.textContent = `${c.name} saved ✓ (${Math.round(r.bytes / 1e6)} MB)`;
+  setTimeout(showCityPacks, 6000);
+}
+for (const b of document.querySelectorAll('[data-city]')) {
+  const c = CITY_PACKS.find((p) => p.name === b.dataset.city);
+  if (c) b.onclick = () => saveCity(c, b);
+}
+showCityPacks();
 async function showSavedAreas() {
   const el = $('#saved-areas');
   if (!el || !hasCaches) return;
