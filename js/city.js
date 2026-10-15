@@ -17,6 +17,8 @@ export const CITY_GROUPS = {
 
 const W = (stops) => ['interpolate', ['exponential', 1.6], ['zoom'], ...stops.flat()];
 const cls = (...c) => ['match', ['get', 'class'], c, true, false];
+// Names in Latin letters where OpenStreetMap has them.
+const NAME = ['coalesce', ['get', 'name:latin'], ['get', 'name_en'], ['get', 'name']];
 const halo = { 'text-halo-color': 'rgba(255,255,255,0.92)', 'text-halo-width': 1.5 };
 
 const ROAD_COLOUR = ['match', ['get', 'class'],
@@ -125,7 +127,7 @@ export function addCityDetail(map, { before, labelsBefore }) {
     id: 'city-road-names', type: 'symbol', 'source-layer': 'transportation_name', minzoom: 13,
     filter: ['has', 'name'],
     layout: {
-      'symbol-placement': 'line', 'text-field': ['coalesce', ['get', 'name_en'], ['get', 'name']], 'text-font': ['OpenSans-Regular'],
+      'symbol-placement': 'line', 'text-field': NAME, 'text-font': ['OpenSans-Regular'],
       'text-size': W([[13, 10], [17, 13]]), 'text-max-angle': 30, 'text-padding': 4,
     },
     paint: { 'text-color': '#4a3d2e', ...halo },
@@ -150,7 +152,7 @@ export function addCityDetail(map, { before, labelsBefore }) {
   add({
     id: 'city-station-names', type: 'symbol', 'source-layer': 'poi', minzoom: 12.5, filter: station,
     layout: {
-      'text-field': ['coalesce', ['get', 'name_en'], ['get', 'name']], 'text-font': ['OpenSans-Semibold'], 'text-size': 11,
+      'text-field': NAME, 'text-font': ['OpenSans-Semibold'], 'text-size': 11,
       'text-anchor': 'top', 'text-offset': [0, 0.6], 'text-max-width': 8, 'text-optional': true,
     },
     paint: { 'text-color': '#3c2a4d', ...halo },
@@ -159,7 +161,7 @@ export function addCityDetail(map, { before, labelsBefore }) {
     id: 'city-places', type: 'symbol', 'source-layer': 'place', minzoom: 11,
     filter: cls('suburb', 'quarter', 'neighbourhood', 'town', 'village', 'hamlet', 'island'),
     layout: {
-      'text-field': ['coalesce', ['get', 'name_en'], ['get', 'name']], 'text-font': ['OpenSans-Semibold'],
+      'text-field': NAME, 'text-font': ['OpenSans-Semibold'],
       'text-size': ['match', ['get', 'class'], ['suburb', 'town'], 13, 11], 'text-transform': 'uppercase',
       'text-letter-spacing': 0.06, 'text-max-width': 8, 'text-padding': 8,
     },
@@ -177,7 +179,7 @@ export function addCityDetail(map, { before, labelsBefore }) {
   add({
     id: 'city-poi-names', type: 'symbol', 'source-layer': 'poi', minzoom: 15, filter: poi,
     layout: {
-      'text-field': ['coalesce', ['get', 'name_en'], ['get', 'name']], 'text-font': ['OpenSans-Regular'], 'text-size': 10.5,
+      'text-field': NAME, 'text-font': ['OpenSans-Regular'], 'text-size': 10.5,
       'text-anchor': 'top', 'text-offset': [0, 0.5], 'text-max-width': 8, 'text-optional': true,
       'symbol-sort-key': ['coalesce', ['get', 'rank'], 99],
     },
@@ -186,7 +188,7 @@ export function addCityDetail(map, { before, labelsBefore }) {
   add({
     id: 'city-airports', type: 'symbol', 'source-layer': 'aerodrome_label', minzoom: 9,
     layout: {
-      'text-field': ['concat', '✈ ', ['coalesce', ['get', 'name_en'], ['get', 'name']], ['case', ['has', 'iata'], ['concat', ' (', ['get', 'iata'], ')'], '']],
+      'text-field': ['concat', '✈ ', NAME, ['case', ['has', 'iata'], ['concat', ' (', ['get', 'iata'], ')'], '']],
       'text-font': ['OpenSans-Semibold'], 'text-size': 12, 'text-max-width': 10,
     },
     paint: { 'text-color': '#3d4a7a', ...halo },
@@ -229,7 +231,7 @@ export function addHills(map, labelsBefore) {
     filter: ['has', 'name'],
     layout: {
       'icon-image': 'peak', 'symbol-sort-key': ['coalesce', ['get', 'rank'], 99],
-      'text-field': ['format', ['coalesce', ['get', 'name_en'], ['get', 'name']], {}, '\n', {},
+      'text-field': ['format', NAME, {}, '\n', {},
         ['case', ['has', 'ele'], ['concat', ['to-string', ['get', 'ele']], ' m'], ''], { 'font-scale': 0.85 }],
       'text-font': ['OpenSans-Semibold'], 'text-size': 11, 'text-anchor': 'top', 'text-offset': [0, 0.7], 'text-optional': true,
     },

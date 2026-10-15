@@ -4,9 +4,6 @@ name: Sample map pieces
 # detail can be checked against real data offline. Run from the Actions tab.
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - .github/workflows/sample-tiles.yml
 
 permissions:
   contents: write

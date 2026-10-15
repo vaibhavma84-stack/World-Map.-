@@ -106,9 +106,22 @@ const zoomed = (pairs) => ['interpolate', ['linear'], ['zoom'], ...pairs.flat()]
 const PORT_ZOOM = [1.5, 3, 4, 5, 5.5];
 const PORT_LAYERS = PORT_ZOOM.flatMap((_, r) => [`ports-${r}`, `port-names-${r}`]);
 
+// Letters for labels. The fonts carry Latin (and a little more); a name in
+// Devanagari or another script would ask for letters that are not there, and
+// a failed request throws away the whole map piece (streets, buildings and
+// all). So missing letters come back empty: the rest still draws.
+maplibregl.addProtocol('glyphs', async (params) => {
+  const [stack, range] = params.url.slice('glyphs://'.length).split('/');
+  try {
+    const res = await fetch(`${here}fonts/${stack.split(',')[0]}/${range}.pbf`);
+    if (res.ok) return { data: await res.arrayBuffer() };
+  } catch { /* offline and not kept */ }
+  return { data: new ArrayBuffer(0) };
+});
+
 const style = {
   version: 8,
-  glyphs: `${here}fonts/{fontstack}/{range}.pbf`,
+  glyphs: 'glyphs://{fontstack}/{range}',
   sources: {
     countries: { type: 'geojson', data: countries, tolerance: 0.05, maxzoom: 14 },
     borders: { type: 'geojson', data: borders, tolerance: 0.05, maxzoom: 14 },
@@ -366,17 +379,21 @@ const LAYER_GROUPS = {
 };
 const shown = { hills: true, ...Object.fromEntries(Object.keys(PLACE_GROUPS).map((g) => [g, true])), cityroads: true, cityrail: true, citybuildings: true, citygreen: true, cityplaces: true, roads: true, eca: true, marpol: true, loadline: true, tss: true, seamarks: true, osmwater: true, terminals: true, currents: true, rivers: true, grid: true, weather: false, ...store.get('layers', {}) };
 let wx = null;
+// Only change what differs: each change makes the map reload that layer's
+// source, and a reload racing a download left the city detail empty.
+function setVisible(id, on) {
+  if (!map.getLayer(id)) return;
+  const want = on ? 'visible' : 'none';
+  if ((map.getLayoutProperty(id, 'visibility') || 'visible') !== want) map.setLayoutProperty(id, 'visibility', want);
+}
 function applyLayers() {
-  for (const [group, ids] of Object.entries(LAYER_GROUPS)) {
-    for (const id of ids) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', shown[group] ? 'visible' : 'none');
-  }
-  wx?.setOn(shown.weather);
+  const want = {};
+  for (const [group, ids] of Object.entries(LAYER_GROUPS)) for (const id of ids) want[id] = !!shown[group];
   // Buildings: flat, or raised in 3D.
-  if (map.getLayer('city-buildings')) {
-    const b = shown.citybuildings;
-    map.setLayoutProperty('city-buildings', 'visibility', b && !threeD?.isOn() ? 'visible' : 'none');
-    map.setLayoutProperty('city-buildings-3d', 'visibility', b && threeD?.isOn() ? 'visible' : 'none');
-  }
+  want['city-buildings'] = shown.citybuildings && !threeD?.isOn();
+  want['city-buildings-3d'] = shown.citybuildings && !!threeD?.isOn();
+  for (const [id, on] of Object.entries(want)) setVisible(id, on);
+  wx?.setOn(shown.weather);
 }
 let threeD = null;
 
