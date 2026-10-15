@@ -7,7 +7,7 @@ export const KINDS = {
   signals: { label: 'Traffic signals', icon: '🚦', colour: '#c0392b', zoom: 15 },
   fuel: { label: 'Petrol pumps', icon: '⛽', colour: '#555555', zoom: 13 },
   cafe: { label: 'Cafés', icon: '☕', colour: '#8d5524', zoom: 14 },
-  restaurant: { label: 'Restaurants', icon: '🍽️', colour: '#c0392b', zoom: 14 },
+  restaurant: { label: 'Restaurants (Michelin links highlighted)', icon: '🍽️', colour: '#c0392b', zoom: 14 },
   bar: { label: 'Bars and pubs', icon: '🍺', colour: '#b7791f', zoom: 14 },
   nightclub: { label: 'Nightclubs', icon: '🪩', colour: '#7b2cbf', zoom: 13 },
   hotel: { label: 'Hotels (5★ highlighted)', icon: '🏨', colour: '#2c7a7b', zoom: 13 },
@@ -18,7 +18,8 @@ export const KINDS = {
   snooker: { label: 'Snooker and pool', icon: '🎱', colour: '#1a202c', zoom: 13 },
   shooting: { label: 'Shooting ranges', icon: '🎯', colour: '#9b2c2c', zoom: 12 },
 };
-export const PLACE_GROUPS = Object.fromEntries(Object.keys(KINDS).map((k) => [`poi-${k}`, k === 'hotel' ? ['poi-hotel', 'poi-hotel-5'] : [`poi-${k}`]]));
+export const PLACE_GROUPS = Object.fromEntries(Object.keys(KINDS).map((k) => [`poi-${k}`,
+  k === 'hotel' ? ['poi-hotel', 'poi-hotel-5'] : k === 'restaurant' ? ['poi-restaurant', 'poi-michelin'] : [`poi-${k}`]]));
 
 function iconImage(emoji, ring, gold = false) {
   const s = 2, size = (gold ? 34 : 26) * s;
@@ -39,16 +40,38 @@ function iconImage(emoji, ring, gold = false) {
   return g.getImageData(0, 0, size, size);
 }
 
+// Luxury hotels whose star rating OpenStreetMap does not record, by name.
+const LUXURY = /\b(Taj Mahal Palace|Taj President|Taj Lands End|Taj Santacruz|Four Seasons|St\.? Regis|The Leela|Leela Kempinski|Kempinski Leela|Sofitel|Trident|Oberoi|JW Marriott|Grand Hyatt|ITC Maratha|ITC Grand Central|Ritz[- ]Carlton|Westin)\b/i;
+// Restaurants linked to Michelin stars. Michelin has no guide for India, so
+// no restaurant here holds a star itself; these are run by a Michelin-starred
+// chef, or share a name and kitchen with a starred restaurant abroad.
+const MICHELIN = [
+  [/^Yauatcha\b/i, 'Yauatcha London (Soho) held a Michelin star; this is its Mumbai sister restaurant.'],
+  [/^Hakkasan\b/i, 'Hakkasan London held a Michelin star; this is its Mumbai sister restaurant (check it is still open).'],
+  [/^Ziya\b/i, 'Menu by Vineet Bhatia, the first Indian chef to win a Michelin star (Zaika and Rasoi, London). Check it is still open.'],
+  [/^Trishna\b/i, 'Trishna London, named after and inspired by this Mumbai restaurant, won a Michelin star.'],
+];
+
 export async function addCityPlaces(map, labelsBefore) {
   const data = await fetch('data/city-extras.json').then((r) => (r.ok ? r.json() : null)).catch(() => null);
   if (!data?.features?.length) return false;
+  for (const f of data.features) {
+    const p = f.properties;
+    if (p.k === 'hotel' && !(p.s >= 5) && LUXURY.test(p.n || '')) p.lux = 1;
+    if (p.k === 'restaurant' || p.k === 'bar') {
+      const m = MICHELIN.find(([re]) => re.test(p.n || ''));
+      if (m) p.mi = m[1];
+    }
+    if (p.s >= 5 || p.lux) p.gold = 1;
+  }
   map.addSource('cityx', { type: 'geojson', data });
   for (const [k, d] of Object.entries(KINDS)) {
     map.addImage(`poi-${k}`, iconImage(d.icon, d.colour), { pixelRatio: 2 });
     if (k === 'hotel') map.addImage('poi-hotel-5', iconImage('⭐', d.colour, true), { pixelRatio: 2 });
     map.addLayer({
       id: `poi-${k}`, type: 'symbol', source: 'cityx', minzoom: d.zoom,
-      filter: k === 'hotel' ? ['all', ['==', ['get', 'k'], 'hotel'], ['<', ['coalesce', ['get', 's'], 0], 5]] : ['==', ['get', 'k'], k],
+      filter: k === 'hotel' ? ['all', ['==', ['get', 'k'], 'hotel'], ['!', ['has', 'gold']]]
+        : k === 'restaurant' ? ['all', ['==', ['get', 'k'], k], ['!', ['has', 'mi']]] : ['==', ['get', 'k'], k],
       layout: {
         'icon-image': `poi-${k}`, 'icon-allow-overlap': k === 'signals', 'icon-size': k === 'signals' ? 0.75 : 1,
         'text-field': k === 'signals' ? '' : ['step', ['zoom'], '', d.zoom + 1.5, ['coalesce', ['get', 'n'], '']],
@@ -61,7 +84,7 @@ export async function addCityPlaces(map, labelsBefore) {
   // Five-star hotels: on top, gold, shown from further out and never hidden.
   map.addLayer({
     id: 'poi-hotel-5', type: 'symbol', source: 'cityx', minzoom: 10,
-    filter: ['all', ['==', ['get', 'k'], 'hotel'], ['>=', ['coalesce', ['get', 's'], 0], 5]],
+    filter: ['all', ['==', ['get', 'k'], 'hotel'], ['has', 'gold']],
     layout: {
       'icon-image': 'poi-hotel-5', 'icon-allow-overlap': true, 'icon-ignore-placement': false,
       'text-field': ['step', ['zoom'], '', 12, ['coalesce', ['get', 'n'], '']],
@@ -69,13 +92,26 @@ export async function addCityPlaces(map, labelsBefore) {
     },
     paint: { 'text-color': '#9a6b00', 'text-halo-color': '#fffbe6', 'text-halo-width': 2 },
   }, labelsBefore);
+  // Restaurants linked to Michelin stars: a gold rosette, on top.
+  map.addImage('poi-michelin', iconImage('🏵️', '#c0392b', true), { pixelRatio: 2 });
+  map.addLayer({
+    id: 'poi-michelin', type: 'symbol', source: 'cityx', minzoom: 10, filter: ['has', 'mi'],
+    layout: {
+      'icon-image': 'poi-michelin', 'icon-allow-overlap': true,
+      'text-field': ['step', ['zoom'], '', 12, ['coalesce', ['get', 'n'], '']],
+      'text-font': ['OpenSans-Bold'], 'text-size': 11.5, 'text-anchor': 'top', 'text-offset': [0, 1.3], 'text-optional': true,
+    },
+    paint: { 'text-color': '#a3271b', 'text-halo-color': '#fffbe6', 'text-halo-width': 2 },
+  }, labelsBefore);
   return true;
 }
 
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 export function placeCard(p, position) {
   const d = KINDS[p.k] || { label: 'Place', icon: '📍' };
-  const stars = p.s ? `<div class="big">${'★'.repeat(Math.round(p.s))}<span class="note"> ${p.s}-star</span></div>` : '';
+  const stars = p.s ? `<div class="big">${'★'.repeat(Math.round(p.s))}<span class="note"> ${p.s}-star</span></div>`
+    : p.lux ? '<div class="big">★★★★★<span class="note"> luxury (5-star class); rating not recorded in OpenStreetMap</span></div>' : '';
+  const michelin = p.mi ? `<div class="big">🏵️ Michelin link</div><div class="note">${esc(p.mi)}</div>` : '';
   const rows = [
     ['Cuisine', p.cu], ['Brand', p.br], ['Open', p.oh], ['Phone', p.ph && `<a href="tel:${esc(p.ph)}">${esc(p.ph)}</a>`],
     ['Website', p.web && `<a href="${esc(p.web)}" target="_blank" rel="noopener">${esc(p.web.replace(/^https?:\/\//, '').replace(/\/$/, ''))}</a>`],
@@ -85,7 +121,7 @@ export function placeCard(p, position) {
   return `<h1>${d.icon} ${esc(p.n || d.label)}</h1>
     <p class="sub">${esc(d.label)} · ${esc(position)}</p>
     ${p.img ? `<img class="place-photo" src="${esc(p.img)}" alt="" loading="lazy" onerror="this.remove()">` : ''}
-    <div class="cards"><div class="card">${stars}
+    <div class="cards"><div class="card">${stars}${michelin}
       ${rows.length ? `<table class="facts">${rows.map(([k, v]) => `<tr><th>${k}</th><td>${k === 'Phone' || k === 'Website' || k === 'Wikipedia' ? v : esc(v)}</td></tr>`).join('')}</table>` : '<div class="note">No more details recorded.</div>'}
     </div></div>
     <p class="hint small">From OpenStreetMap${p.img ? '; photo from Wikimedia Commons' : ''}. Details may be out of date.</p>`;
