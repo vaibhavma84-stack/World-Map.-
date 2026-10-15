@@ -1,0 +1,23 @@
+name: Check the published app
+
+# Opens the published iPhone app in WebKit and Chromium and reports how the
+# detailed world coastline loads. Run from the Actions tab.
+on:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-save playwright@1.48.2 && npx playwright install --with-deps webkit chromium
+      - run: node tools/diag-site.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screenshots
+          path: diag-*.png

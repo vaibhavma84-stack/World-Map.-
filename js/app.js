@@ -258,6 +258,7 @@ const map = new maplibregl.Map({
   pixelRatio: Math.max(2, window.devicePixelRatio || 1),
   antialias: true,
 });
+window.wmMap = map; // for checks from outside (tools/diag-site.mjs)
 map.touchZoomRotate.disableRotation();
 map.addControl(new maplibregl.AttributionControl({
   compact: true,
