@@ -41,6 +41,6 @@ export function discoverCard(p, position) {
       ${p.pa ? `<div class="note">📍 ${esc(p.pa)}</div>` : ''}
       <p>${esc(p.d)}</p>
       ${p.url ? `<p><a href="${esc(p.url)}" target="_blank" rel="noopener">Read more on Wikipedia</a></p>` : ''}
-      <div class="note">Text and photo from Wikipedia (CC BY-SA)${p.g === 'wreck' ? '; positions as Wikipedia gives them, not for navigation' : ''}.</div>
+      <div class="note">Text and photo from Wikipedia (CC BY-SA)${p.g === 'wreck' ? '; positions not for navigation' : ''}.</div>
     </div></div>`;
 }
