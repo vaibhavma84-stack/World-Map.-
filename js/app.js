@@ -2,11 +2,16 @@ import { COUNTRIES, countryName, currencyName, currencySymbol, flag } from './co
 import { PHRASES, LANGUAGES, TERMS, languageName } from './languages.js';
 import { setupWeather, tideAt, turningPoints, flowImage } from './weather.js';
 import { currentFeatures } from './currents.js';
-import { setupVoyage } from './voyage.js';
+import { setupVoyage, project } from './voyage.js';
 import { addZones, zonesAt, zonesCard } from './zones.js';
 import { addCityDetail, addHills, setup3D, CITY_GROUPS } from './city.js';
 import { addCityPlaces, placeCard, KINDS as PLACE_KINDS, PLACE_GROUPS } from './places.js';
 import { setupMyPlaces, loadMyPlaces } from './myplaces.js';
+import { openSky } from './sky.js';
+import { setupVoyages } from './voyages.js';
+import { openLearn, ialaRegion } from './learn.js';
+import { openSpace } from './space.js';
+import { addDiscover, discoverCard, DISCOVER_GROUPS } from './discover.js';
 import {
   offsetMinutes, zonedToUtc, formatOffset, formatSpan, clock, longDate, shipClock,
   nextClockChange, sun, position,
@@ -293,6 +298,8 @@ map.getCanvas().addEventListener('mouseleave', () => { $('#coords').textContent 
 
 // Tap a port, or near one: fingers are wider than dots.
 let myPlaces = null;
+let myVoyages = null;
+let discoverPlaces = [];
 let cityPlaces = [];
 map.on('click', (e) => {
   if (myPlaces?.justHeld()) return;
@@ -302,6 +309,15 @@ map.on('click', (e) => {
   if (map.getLayer('voyage-ship') && map.queryRenderedFeatures(box, { layers: ['voyage-ship', 'voyage-ahead'] })[0]) { voyage.open(); return; }
   const mine = myPlaces?.hit(box);
   if (mine) { myPlaces.show(mine.properties.id); return; }
+  const callHit = shown.voyages && map.getLayer('voyages-calls') && map.queryRenderedFeatures(box, { layers: ['voyages-calls'] })[0];
+  if (callHit) { myVoyages.show(); return; }
+  const discLayers = Object.values(DISCOVER_GROUPS).flat().filter((id) => map.getLayer(id));
+  const discHit = discLayers.length && map.queryRenderedFeatures(box, { layers: discLayers })[0];
+  if (discHit) {
+    const [lon, lat] = discHit.geometry.coordinates;
+    openPanel(discoverCard(discHit.properties, position(lat, lon)));
+    return;
+  }
   const poiLayers = Object.values(PLACE_GROUPS).flat().filter((id) => map.getLayer(id));
   const placeHit = poiLayers.length && map.queryRenderedFeatures(box, { layers: poiLayers })[0];
   if (placeHit) {
@@ -383,8 +399,10 @@ const LAYER_GROUPS = {
   ...CITY_GROUPS,
   ...PLACE_GROUPS,
   myplaces: ['my-places'],
+  voyages: ['voyages-legs', 'voyages-calls'],
+  ...DISCOVER_GROUPS,
 };
-const shown = { myplaces: true, hills: true, ...Object.fromEntries(Object.keys(PLACE_GROUPS).map((g) => [g, true])), cityroads: true, cityrail: true, citybuildings: true, citygreen: true, cityplaces: true, roads: true, eca: true, marpol: true, loadline: true, tss: true, seamarks: true, osmwater: true, terminals: true, currents: true, rivers: true, grid: true, weather: false, ...store.get('layers', {}) };
+const shown = { myplaces: true, voyages: true, wrecks: true, history: true, marinelife: true, hills: true, ...Object.fromEntries(Object.keys(PLACE_GROUPS).map((g) => [g, true])), cityroads: true, cityrail: true, citybuildings: true, citygreen: true, cityplaces: true, roads: true, eca: true, marpol: true, loadline: true, tss: true, seamarks: true, osmwater: true, terminals: true, currents: true, rivers: true, grid: true, weather: false, ...store.get('layers', {}) };
 let wx = null;
 // Only change what differs: each change makes the map reload that layer's
 // source, and a reload racing a download left the city detail empty.
@@ -770,7 +788,10 @@ map.on('load', () => {
     reload: $('#wx-reload'), kinds: [...document.querySelectorAll('#wx-bar [data-kind]')],
   });
   voyage = setupVoyage(map, { openPanel, closePanel, $, hint, padding: clearOfPanel });
+  myVoyages = setupVoyages(map, { openPanel, closePanel, findPorts: (t) => search(t).filter((p) => !p.place), countryName, flag });
   myPlaces = setupMyPlaces(map, { openPanel, closePanel, position });
+  myVoyages.onPlacesLoaded(() => myPlaces.refresh());
+  addDiscover(map, 'voyages-legs').then((f) => { discoverPlaces = f || []; applyLayers(); });
   $('#add-place').onclick = () => { layersBox.hidden = true; myPlaces.addAtCentre(); };
   applyLayers();
 });
@@ -785,7 +806,59 @@ $('#layers-btn').onclick = () => {
   layersBox.hidden = !layersBox.hidden;
   $('#layers-btn').setAttribute('aria-expanded', String(!layersBox.hidden));
 };
-map.on('click', () => { layersBox.hidden = true; });
+map.on('click', () => { layersBox.hidden = true; moreBox.hidden = true; });
+
+// More: the night sky, the view from space, my voyages, learn.
+const moreBox = $('#more');
+$('#more-btn').onclick = () => { moreBox.hidden = !moreBox.hidden; layersBox.hidden = true; };
+// Where the sky is seen from: the ship, by dead reckoning from her last
+// position, or else the middle of the map.
+function skyPlace() {
+  try {
+    const v = JSON.parse(localStorage.getItem('wm.voyage'));
+    if (v && Number.isFinite(v.lat)) {
+      const hours = Math.max(0, (Date.now() - Date.parse(v.time)) / 3600000);
+      const p = project(v, hours);
+      return { lat: p.lat, lon: p.lon, label: `The ship (${position(p.lat, p.lon)}, by DR)` };
+    }
+  } catch { /* none */ }
+  const c = map.getCenter();
+  return { lat: c.lat, lon: ((c.lng + 540) % 360) - 180, label: `Middle of the map (${position(c.lat, ((c.lng + 540) % 360) - 180)}). Set the ship's position for the sky at the ship.` };
+}
+let space = null;
+function goToSpace() {
+  if (space) return;
+  moreBox.hidden = true;
+  const p = skyPlace();
+  space = openSpace({ countries, here: p, onClose: () => { space = null; if (map.getZoom() < 1) map.easeTo({ zoom: 1.3 }); } });
+}
+for (const b of moreBox.querySelectorAll('[data-more]')) {
+  b.onclick = () => {
+    moreBox.hidden = true;
+    const what = b.dataset.more;
+    if (what === 'sky') openSky({ openPanel, place: skyPlace });
+    if (what === 'space') goToSpace();
+    if (what === 'voyages') myVoyages?.show();
+    if (what === 'learn') openLearn({ openPanel });
+  };
+}
+// Zooming out past the whole world goes on into space.
+{
+  let push = 0, pinchStart = 0;
+  // The whole world in view: the map can go no further out (about zoom 0.75
+  // on a phone, held by the world's height).
+  const atMin = () => map.getZoom() < 1.05;
+  map.getCanvasContainer().addEventListener('wheel', (e) => {
+    if (atMin() && e.deltaY > 0) { push += e.deltaY; if (push > 400) { push = 0; goToSpace(); } } else push = 0;
+  }, { passive: true });
+  const dist = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+  map.getCanvasContainer().addEventListener('touchstart', (e) => { pinchStart = e.touches.length === 2 && atMin() ? dist(e.touches) : 0; }, { passive: true });
+  map.getCanvasContainer().addEventListener('touchmove', (e) => {
+    if (e.touches.length !== 2) return;
+    if (!pinchStart && atMin()) pinchStart = dist(e.touches);
+    if (pinchStart && atMin() && dist(e.touches) < pinchStart * 0.6) { pinchStart = 0; goToSpace(); }
+  }, { passive: true });
+}
 
 threeD = setup3D(map, $('#btn-3d'), () => applyLayers());
 
@@ -966,7 +1039,7 @@ function openCountry(cc, name = countryName(cc)) {
 
   openPanel(`
     <h1>${flag(cc)} ${esc(name)}</h1>
-    <p class="sub">${own.length.toLocaleString('en')} ports · zoom in to see them all</p>
+    <p class="sub">${own.length.toLocaleString('en')} ports · buoyage IALA Region ${ialaRegion(cc)} · zoom in to see them all</p>
     <div class="cards">
       ${zones.length ? `<div class="card" id="c-local"></div>` : ''}
       ${money ? moneyCards(money) : ''}
@@ -1037,7 +1110,7 @@ function showPort(p) {
   openPanel(`
     <h1>${esc(p.name)}</h1>
     <p class="sub"><button type="button" class="linkish inline" data-country="${esc(p.cc)}">${flag(p.cc)} ${esc(countryName(p.cc))} ›</button> · ${position(p.lat, p.lon)}</p>
-    <div class="chips">${chips.map((c) => `<span class="chip">${esc(c)}</span>`).join('')}</div>
+    <div class="chips">${chips.map((c) => `<span class="chip">${esc(c)}</span>`).join('')}<button type="button" class="chip chip-btn" id="add-call">＋ Add to my voyages</button></div>
     <div class="now"><span class="time" id="t-now"></span><span class="zone" id="t-zone"></span></div>
     <div class="date" id="t-date"></div>
     <div class="cards">
@@ -1060,6 +1133,7 @@ function showPort(p) {
     </div>
     <p class="source">${p.detail >= 0 ? 'NGA World Port Index' : 'UN/LOCODE'} · ${esc(p.tz)} · Not for navigation.</p>`);
 
+  $('#add-call').onclick = () => myVoyages?.addPort(p);
   const eta = $('#eta');
   eta.value = store.get(`eta.${p.locode || p.i}`, '');
   eta.addEventListener('input', () => { store.set(`eta.${p.locode || p.i}`, eta.value); renderEta(p); });

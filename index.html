@@ -44,9 +44,19 @@
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
     </button>
     <button id="btn-3d" class="icon round label" type="button" aria-label="3D view" aria-pressed="false">3D</button>
+    <button id="more-btn" class="icon round" type="button" aria-label="More: night sky, my voyages, learn, space" aria-haspopup="true">
+      <svg viewBox="0 0 24 24"><path d="M12 3l2.4 5.6 6.1.5-4.6 4 1.4 6-5.3-3.2-5.3 3.2 1.4-6-4.6-4 6.1-.5z"/></svg>
+    </button>
     <button id="world" class="icon round" type="button" aria-label="Whole world">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/></svg>
     </button>
+  </div>
+
+  <div id="more" class="layers more-menu" hidden>
+    <button type="button" data-more="sky">🌌 Night sky <small>stars, planets, Sun and Moon at the ship</small></button>
+    <button type="button" data-more="space">🌍 Earth, Moon and Sun from space</button>
+    <button type="button" data-more="voyages">🧭 My voyages <small>ports called, on the map</small></button>
+    <button type="button" data-more="learn">📘 Learn <small>lights, shapes, sounds, buoys, MARPOL, quiz</small></button>
   </div>
 
   <div id="layers" class="layers" hidden>
@@ -62,6 +72,11 @@
     <p class="layers-head">My places <small>press and hold the map to add one</small></p>
     <label><input type="checkbox" data-layer="myplaces"> ⭐ My places</label>
     <button id="add-place" type="button" class="secondary wide">Add a place at the centre of the map</button>
+    <p class="layers-head">Discover <small>tap one for its story · photos and text from Wikipedia</small></p>
+    <label><input type="checkbox" data-layer="wrecks"> ⚓ Famous wrecks</label>
+    <label><input type="checkbox" data-layer="history"> 🧭 Maritime history</label>
+    <label><input type="checkbox" data-layer="marinelife"> 🐋 Marine life <small>whales, turtles, glowing seas, with seasons</small></label>
+    <label><input type="checkbox" data-layer="voyages"> My voyages</label>
     <p class="layers-head">Places to go <small>Mumbai · tap for details and photos</small></p>
     <div id="poi-switches"></div>
     <p class="layers-head">Map</p>

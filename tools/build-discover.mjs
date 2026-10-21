@@ -61,6 +61,9 @@ const LIFE = [
   ['Andaman Sea', 'life', 'Manta rays and whale sharks around the Similan Islands, February to April.'],
 ];
 
+// Where Wikipedia's summary gives the wrong place for the wreck itself.
+const POSITION = { 'Endurance (1912 ship)': [-52.33, -68.74] }; // found 2022, Weddell Sea
+
 const UA = { 'User-Agent': 'WorldMapDiscover/1.0 (https://github.com/vaibhavma84-stack/World-Map.-; personal map)' };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function summary(title) {
@@ -88,6 +91,7 @@ const jobs = [...WRECKS.map((t) => [t, 'wreck']), ...HISTORY.map((t) => [t, 'his
 for (const [title, group, kind, season] of jobs) {
   const s = await summary(title);
   await sleep(300);
+  if (s && POSITION[title]) s.coordinates = { lon: POSITION[title][0], lat: POSITION[title][1] };
   if (!s?.coordinates) {
     const old = previous.find((f) => f.properties.t === title);
     if (old) features.push(old);

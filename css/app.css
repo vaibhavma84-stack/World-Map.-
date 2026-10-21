@@ -270,3 +270,56 @@ table.ahead .zone { margin-top: 3px; font-size: 12px; color: #1f6e3f; }
 .myplace-form .row-end, .card .row-end { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; }
 .myplace-note { white-space: normal; margin: 0 0 8px; }
 a.button { display: inline-block; text-decoration: none; padding: 8px 14px; border-radius: 8px; }
+
+/* More menu */
+.more-menu button { display: block; width: 100%; text-align: left; padding: 10px 6px; background: none; border: 0; border-bottom: 1px solid var(--line); font: inherit; color: var(--ink); cursor: pointer; }
+.more-menu button:last-child { border-bottom: 0; }
+.more-menu small { display: block; color: var(--muted); font-size: 12px; }
+.chip-btn { border: 0; cursor: pointer; font: inherit; color: var(--accent); }
+
+/* Night sky */
+.sky-views { display: flex; gap: 4px; margin: 8px 0; flex-wrap: wrap; }
+.sky-views button { flex: 1; min-width: 60px; padding: 7px 4px; border: 1px solid var(--line); background: var(--card-solid); color: var(--ink); border-radius: 8px; font: inherit; font-size: 13px; cursor: pointer; }
+.sky-views button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.sky-wrap { background: #050a18; border-radius: 12px; padding: 4px; }
+#sky-canvas { display: block; width: 100%; height: auto; touch-action: manipulation; }
+.sky-pick { margin: 8px 0; min-height: 2.6em; font-size: 14px; }
+.sky-time input[type=range] { width: 100%; }
+.sky-buttons { display: flex; gap: 6px; margin: 6px 0; }
+.sky-buttons button { flex: 1; font-size: 12px; padding: 7px 4px; }
+.sky-check { display: flex; gap: 8px; align-items: center; font-size: 13px; }
+.sky-table td, .sky-table th { padding: 3px 6px; font-variant-numeric: tabular-nums; }
+
+/* Learn */
+.learn-card { display: flex; gap: 12px; align-items: flex-start; }
+.learn-card h3 { margin: 0 0 4px; font-size: 15px; }
+.learn-card p { margin: 0 0 4px; }
+.learn-pics { display: flex; gap: 6px; flex: none; }
+.learn-svg { display: block; }
+.learn-table th { white-space: nowrap; font-family: ui-monospace, monospace; font-size: 13px; }
+.quiz-pic { margin: 8px 0; }
+.quiz-options { display: grid; gap: 6px; margin: 10px 0; }
+.quiz-options button { text-align: left; }
+.quiz-options .right { background: #d4f5dd; border-color: #2f855a; color: #1c4532; }
+.quiz-options .wrong { background: #fde2e2; border-color: #c53030; color: #742a2a; }
+.big-note { font-weight: 600; margin-bottom: 6px; }
+
+/* My voyages */
+ol.calls { margin: 0; padding-left: 22px; }
+ol.calls li { margin: 4px 0; }
+ol.calls .note { display: block; }
+.flags { font-size: 15px; }
+label.button { cursor: pointer; }
+
+/* View from space */
+.space { position: fixed; inset: 0; z-index: 1000; background: #02040a; color: #e8eefc; touch-action: none; }
+.space canvas { position: absolute; inset: 0; }
+.space-top { position: absolute; top: calc(10px + var(--safe-top)); left: 10px; right: 10px; display: flex; gap: 10px; align-items: center; }
+.space-title { font-weight: 600; text-shadow: 0 1px 3px #000; }
+.space-info { position: absolute; top: calc(60px + var(--safe-top)); left: 12px; right: 12px; font-size: 13px; line-height: 1.45; text-shadow: 0 1px 3px #000; pointer-events: none; }
+.space-bottom { position: absolute; left: 12px; right: 12px; bottom: calc(12px + var(--safe-bottom)); }
+.space-bottom input[type=range] { width: 100%; }
+.space-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 13px; }
+.space-row label { display: flex; gap: 6px; align-items: center; margin-right: auto; }
+.row-end .secondary, .space-row .secondary, .sky-buttons .secondary, .quiz-options .secondary { width: auto; margin-bottom: 0; }
+.quiz-options .secondary { width: 100%; }

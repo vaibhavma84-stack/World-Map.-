@@ -124,5 +124,6 @@ export function setupMyPlaces(map, { openPanel, closePanel, position, before }) 
     hit: (box) => map.queryRenderedFeatures(box, { layers: ['my-places'] })[0],
     show: (id) => show(loadMyPlaces().find((x) => x.id === id)),
     addAtCentre: () => add(map.getCenter()),
+    refresh,
   };
 }
