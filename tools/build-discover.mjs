@@ -64,7 +64,19 @@ const LIFE = [
 ];
 
 // Where Wikipedia's summary gives the wrong place for the wreck itself.
-const POSITION = { 'Endurance (1912 ship)': [-52.33, -68.74] }; // found 2022, Weddell Sea
+const POSITION = {
+  // [longitude, latitude, what the position is]
+  'Endurance (1912 ship)': [-52.33, -68.74, 'Where the wreck was found in 2022, in the Weddell Sea.'],
+  'SS Tilawa': [61.13, 7.6, 'Where she was torpedoed by I-29 (07°36′N 061°08′E, as usually given), north-west of the Maldives.'],
+  'X-Press Pearl|X-Press Pearl disaster': [79.75, 7.07, 'Approximate: the anchorage about 9.5 nm north-west of Colombo, where she burned and sank.'],
+  'MSC Elsa 3': [76.13, 9.31, 'Approximate: about 14.6 nm off Thottappally, Kerala, as reported.'],
+  'SS Arctic': [-52.62, 46.25, 'Approximate: the area south-east of Cape Race where she sank; the wreck has never been found.'],
+  'MV Derbyshire': [130.5, 25.5, 'Approximate: south of Japan, east of Okinawa; the wreck lies about 4,200 m down.'],
+  'MV Doña Paz': [121.65, 13.0, 'Approximate: Tablas Strait off Dumali Point, Mindoro, in about 545 m of water.'],
+  'MV Le Joola|Le Joola': [-17.0, 13.3, 'Approximate: off the coast of The Gambia, where she capsized in a storm.'],
+  'MSC Napoli': [-3.13, 50.675, 'Approximate: about a mile off Branscombe, Devon, where she was beached.'],
+  'SS Vaitarna': [69.95, 21.0, 'Approximate: lost off Mangrol on the Kathiawar coast; no wreck has ever been found.'],
+};
 
 const UA = { 'User-Agent': 'WorldMapDiscover/1.0 (https://github.com/vaibhavma84-stack/World-Map.-; personal map)' };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -127,6 +139,7 @@ for (const [title, group, kind, season] of jobs) {
   }
   const p = { t: title, g: group, n: s.title, d: (s.extract || '').slice(0, 900), url: s.content_urls?.mobile?.page || s.content_urls?.desktop?.page };
   if (kind) p.k = kind;
+  if (POSITION[title]?.[2]) p.pa = POSITION[title][2];
   if (season) p.s = season;
   if (s.thumbnail?.source) p.img = s.thumbnail.source.replace(/\/\d+px-/, '/480px-');
   features.push({ type: 'Feature', properties: p, geometry: { type: 'Point', coordinates: [Math.round(s.coordinates.lon * 1e5) / 1e5, Math.round(s.coordinates.lat * 1e5) / 1e5] } });
