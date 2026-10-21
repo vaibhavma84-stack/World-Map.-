@@ -12,13 +12,15 @@ import { readFileSync, writeFileSync } from 'node:fs';
 // Wrecks and disasters at sea.
 const WRECKS = [
   'Titanic', 'RMS Lusitania', 'German battleship Bismarck', 'SS Edmund Fitzgerald', 'Mary Rose', 'SS Andrea Doria',
-  'Costa Concordia disaster', 'MV Wilhelm Gustloff', 'MS Estonia', 'MV Doña Paz', 'Exxon Valdez oil spill',
-  'Torrey Canyon oil spill', 'Prestige oil spill', 'MV Wakashio oil spill', 'X-Press Pearl', 'MV Rena oil spill',
-  'MSC Napoli', 'Endurance (1912 ship)', 'Japanese battleship Yamato', 'USS Arizona (BB-39)', 'Batavia (1628 ship)',
-  'SS Central America', 'Nuestra Señora de Atocha', 'HMHS Britannic', 'SS Thistlegorm', 'SS Yongala', 'MV Le Joola',
-  'Sinking of MV Sewol', 'SS Vaitarna', 'SS Tilawa', 'Bombay explosion (1944)', 'MSC Elsa 3', '2021 Suez Canal obstruction',
+  'Costa Concordia disaster', 'MV Wilhelm Gustloff|Sinking of the Wilhelm Gustloff', 'MS Estonia', 'MV Doña Paz',
+  'Exxon Valdez oil spill', 'Torrey Canyon oil spill', 'Prestige oil spill', 'MV Wakashio oil spill',
+  'X-Press Pearl|X-Press Pearl disaster', 'MV Rena oil spill|MV Rena', 'MSC Napoli', 'Endurance (1912 ship)',
+  'Japanese battleship Yamato', 'USS Arizona (BB-39)', 'Batavia (1628 ship)', 'SS Central America',
+  'Nuestra Señora de Atocha', 'HMHS Britannic', 'SS Thistlegorm', 'SS Yongala', 'MV Le Joola|Le Joola',
+  'Sinking of MV Sewol', 'SS Vaitarna', 'SS Tilawa', 'MSC Elsa 3', '2021 Suez Canal obstruction',
   'Amoco Cadiz', 'Herald of Free Enterprise', 'SS Arctic', 'HMS Hood (51)', 'Vasa (ship)', 'RMS Empress of Ireland',
-  'SS Eastland', 'MV Derbyshire', 'Erika (ship)', 'SS Fort Stikine', 'MV Golden Ray', 'Dali (ship)',
+  'SS Eastland', 'MV Derbyshire', 'Erika (ship)|MV Erika', 'SS Fort Stikine', 'MV Golden Ray',
+  'Francis Scott Key Bridge collapse|Dali (ship)',
 ];
 // Maritime history: old ports, canals, capes and straits with a story.
 const HISTORY = [
@@ -66,6 +68,31 @@ const POSITION = { 'Endurance (1912 ship)': [-52.33, -68.74] }; // found 2022, W
 
 const UA = { 'User-Agent': 'WorldMapDiscover/1.0 (https://github.com/vaibhavma84-stack/World-Map.-; personal map)' };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// A page's position when the summary has none: the first one given
+// anywhere in the article (wrecks often carry it lower down).
+async function anyCoordinates(title) {
+  try {
+    const url = `https://en.wikipedia.org/w/api.php?${new URLSearchParams({ action: 'query', format: 'json', prop: 'coordinates', coprimary: 'all', colimit: '10', redirects: '1', titles: title })}`;
+    const j = await (await fetch(url, { headers: UA })).json();
+    const page = Object.values(j.query?.pages || {})[0];
+    const c = page?.coordinates?.find((x) => x.globe === 'earth') || page?.coordinates?.[0];
+    return c ? { lat: c.lat, lon: c.lon } : null;
+  } catch { return null; }
+}
+async function lookup(titles) {
+  let first = null;
+  for (const t of titles.split('|')) {
+    const s = await summary(t);
+    if (!s) continue;
+    first ||= s;
+    if (!s.coordinates) {
+      const c = await anyCoordinates(s.title || t);
+      if (c) { s.coordinates = c; console.log(`  ${t}: position from the article body`); }
+    }
+    if (s.coordinates) return s;
+  }
+  return first;
+}
 async function summary(title) {
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
@@ -89,7 +116,7 @@ const features = [];
 const missing = [];
 const jobs = [...WRECKS.map((t) => [t, 'wreck']), ...HISTORY.map((t) => [t, 'history']), ...LIFE.map(([t, k, s]) => [t, 'life', k, s])];
 for (const [title, group, kind, season] of jobs) {
-  const s = await summary(title);
+  const s = await lookup(title);
   await sleep(300);
   if (s && POSITION[title]) s.coordinates = { lon: POSITION[title][0], lat: POSITION[title][1] };
   if (!s?.coordinates) {
