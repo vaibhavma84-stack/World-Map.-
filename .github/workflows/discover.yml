@@ -1,0 +1,50 @@
+name: Wrecks, history and marine life
+
+# Famous wrecks, maritime history and marine life from Wikipedia into
+# data/discover.json. Monthly, on changes to its script, or from the
+# Actions tab.
+on:
+  push:
+    paths:
+      - tools/build-discover.mjs
+  schedule:
+    - cron: '17 5 9 * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: discover
+  cancel-in-progress: false
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node tools/build-discover.mjs
+      - name: Save if changed
+        run: |
+          git add data/discover.json
+          git diff --cached --quiet && exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Update wrecks, history and marine life"
+          git pull --rebase -q
+          git push
+
+      # Builds started by this job's own push would not run on their own, so
+      # start the Android and iPhone builds here once there is new data.
+      - name: Rebuild the apps
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [ "$(git rev-parse HEAD)" = "${{ github.sha }}" ] && exit 0
+          gh workflow run android.yml --ref "${{ github.ref_name }}"
+          gh workflow run pages.yml --ref "${{ github.ref_name }}"
