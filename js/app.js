@@ -4,7 +4,7 @@ import { setupWeather, tideAt, turningPoints, flowImage } from './weather.js';
 import { currentFeatures } from './currents.js';
 import { setupVoyage, project } from './voyage.js';
 import { addZones, zonesAt, zonesCard } from './zones.js';
-import { addCityDetail, addHills, setup3D, CITY_GROUPS } from './city.js';
+import { addCityDetail, addHills, setup3D, ensureDem, CITY_GROUPS } from './city.js';
 import { addCityPlaces, placeCard, KINDS as PLACE_KINDS, PLACE_GROUPS } from './places.js';
 import { setupMyPlaces, loadMyPlaces } from './myplaces.js';
 import { openSky } from './sky.js';
@@ -402,7 +402,7 @@ const LAYER_GROUPS = {
   voyages: ['voyages-legs', 'voyages-calls'],
   ...DISCOVER_GROUPS,
 };
-const shown = { myplaces: true, voyages: true, wrecks: true, history: true, marinelife: true, hills: true, ...Object.fromEntries(Object.keys(PLACE_GROUPS).map((g) => [g, true])), cityroads: true, cityrail: true, citybuildings: true, citygreen: true, cityplaces: true, roads: true, eca: true, marpol: true, loadline: true, tss: true, seamarks: true, osmwater: true, terminals: true, currents: true, rivers: true, grid: true, weather: false, ...store.get('layers', {}) };
+const shown = { depth: true, myplaces: true, voyages: true, wrecks: true, history: true, marinelife: true, hills: true, ...Object.fromEntries(Object.keys(PLACE_GROUPS).map((g) => [g, true])), cityroads: true, cityrail: true, citybuildings: true, citygreen: true, cityplaces: true, roads: true, eca: true, marpol: true, loadline: true, tss: true, seamarks: true, osmwater: true, terminals: true, currents: true, rivers: true, grid: true, weather: false, ...store.get('layers', {}) };
 let wx = null;
 // Only change what differs: each change makes the map reload that layer's
 // source, and a reload racing a download left the city detail empty.
@@ -657,6 +657,8 @@ async function addOsmWater() {
 const OSM_WATER_LAYERS = [
   {
     id: 'osm-water', type: 'fill', source: 'osm', 'source-layer': 'water', minzoom: 8,
+    // Docks, rivers and lakes; the open sea is left to the depth shades.
+    filter: ['!=', ['get', 'class'], 'ocean'],
     paint: { 'fill-color': SEA, 'fill-antialias': true },
   },
   {
@@ -763,6 +765,44 @@ async function addHydroRivers() {
   applyLayers();
 }
 
+// The sea in shades of blue by depth (Natural Earth bathymetry: 0, 200,
+// 1000 … 10,000 m), lighter where shallower, from data/bathymetry.pmtiles
+// (offline); and the shape of the seafloor, shaded from the terrain tiles
+// (online; kept once seen, or saved from Settings).
+const DEPTHS = [
+  [0, SEA], [200, '#a5cbe6'], [1000, '#93bfdf'], [2000, '#82b2d8'], [3000, '#72a5d0'], [4000, '#6398c7'],
+  [5000, '#558abd'], [6000, '#487cb2'], [7000, '#3d6ea6'], [8000, '#335f98'], [9000, '#2a518a'], [10000, '#22447b'],
+];
+const DEPTH_FILE = new URL('data/bathymetry.pmtiles', location.href).href;
+const DEPTH_LAYERS = [];
+async function addDepths() {
+  try {
+    const r = await fetch(DEPTH_FILE, { headers: { Range: 'bytes=0-126' } });
+    r.body?.cancel();
+    if (r.status !== 206 || !usePmtiles()) return;
+  } catch { return; }
+  map.addSource('depth', { type: 'vector', url: `pmtiles://${DEPTH_FILE}`, maxzoom: 7 });
+  // Under Natural Earth's land up to zoom 8, then under the detailed land.
+  const high = map.getLayer('world-land') ? 'world-land' : 'detail-mask';
+  for (const [d, colour] of DEPTHS) {
+    for (const [suffix, before, range] of [['', 'grid', { maxzoom: 8 }], ['-hi', high, { minzoom: 8 }]]) {
+      const id = `depth-${d}${suffix}`;
+      map.addLayer({ id, type: 'fill', source: 'depth', 'source-layer': 'depth', ...range, filter: ['==', ['get', 'd'], d], paint: { 'fill-color': colour, 'fill-antialias': false } }, before);
+      DEPTH_LAYERS.push(id);
+    }
+  }
+  // The seafloor's ridges, trenches and seamounts (the hills shading takes
+  // over from zoom 5).
+  ensureDem(map);
+  map.addLayer({
+    id: 'sea-relief', type: 'hillshade', source: 'dem', maxzoom: 5,
+    paint: { 'hillshade-exaggeration': 0.45, 'hillshade-shadow-color': '#1d3557', 'hillshade-highlight-color': '#ffffff', 'hillshade-accent-color': '#1d3557' },
+  }, 'grid');
+  DEPTH_LAYERS.push('sea-relief');
+  LAYER_GROUPS.depth = DEPTH_LAYERS;
+  applyLayers();
+}
+
 async function addWorldCoast() {
   if (!(await worldReady) || !usePmtiles()) return;
   map.addSource('world', { type: 'vector', url: `pmtiles://${WORLD_LAND}`, maxzoom: 11 });
@@ -775,7 +815,7 @@ async function addWorldCoast() {
 }
 
 map.on('load', () => {
-  addWorldCoast();
+  addWorldCoast().then(addDepths);
   addOsmWater().then(applyLayers);
   addTerminals();
   addTss();
@@ -1688,6 +1728,16 @@ async function saveCity(c, button) {
   button.textContent = `${c.name} saved ✓ (${Math.round(r.bytes / 1e6)} MB)`;
   setTimeout(showCityPacks, 6000);
 }
+// The seafloor shading for the whole world: terrain pieces, zoom 0 to 5.
+$('#save-seafloor').onclick = async (e) => {
+  const button = e.currentTarget;
+  if (!hasCaches) { alert('Saving needs a connection the first time the app is opened.'); return; }
+  const tiles = [];
+  for (let z = 0; z <= 5; z++) for (let x = 0; x < 2 ** z; x++) for (let y = 0; y < 2 ** z; y++) tiles.push(['dem', z, x, y]);
+  if (!confirm(`Save the seafloor shading for the whole world: ${tiles.length.toLocaleString()} pieces, roughly 80 MB, on mobile data or Wi-Fi. Keep the app open until it says done.`)) return;
+  const r = await saveTiles(tiles, button, 'Saving the seafloor…');
+  button.textContent = r.failed ? `${r.failed} pieces failed — tap to try again` : `Seafloor saved ✓ (${Math.round(r.bytes / 1e6)} MB)`;
+};
 for (const b of document.querySelectorAll('[data-city]')) {
   const c = CITY_PACKS.find((p) => p.name === b.dataset.city);
   if (c) b.onclick = () => saveCity(c, b);

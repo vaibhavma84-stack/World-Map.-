@@ -80,6 +80,7 @@
     <p class="layers-head">Places to go <small>Mumbai · tap for details and photos</small></p>
     <div id="poi-switches"></div>
     <p class="layers-head">Map</p>
+    <label><input type="checkbox" data-layer="depth"> Ocean depths and seafloor <small>lighter is shallower · depths offline, seafloor shading online or saved</small></label>
     <label><input type="checkbox" data-layer="roads"> Major roads and cities <small>offline; road numbers when zoomed in · online, kept once seen</small></label>
     <label><input type="checkbox" data-layer="tss"> Traffic separation and routes <small>TSS, deep-water and recommended routes · offline</small></label>
     <label><input type="checkbox" data-layer="eca"> Emission control areas (ECA) <small>SOx / NOx, MARPOL Annex VI · tap the sea for details</small></label>
@@ -146,6 +147,8 @@
         <p class="hint" id="save-all-hint" hidden>The detailed coast of the whole world and every harbour, for use with no signal. Works on mobile data as well as Wi-Fi; if the signal drops, tap again and it carries on.</p>
         <button type="button" class="secondary wide" data-city="Mumbai">Download Mumbai map for use at sea</button>
         <p class="hint">Mumbai, Thane and Navi Mumbai in full: every street, railway and metro, buildings, places and hills. Tap again any time to update it.</p>
+        <button id="save-seafloor" type="button" class="secondary wide">Save the seafloor shading for use at sea</button>
+        <p class="hint">The ridges, trenches and seamounts under the sea, for the whole world (about 1,400 pieces, roughly 80 MB). The depth colours are always offline.</p>
         <button id="save-coast" type="button" class="secondary">Save all harbour coastlines</button>
         <p class="hint">Detailed harbour coastlines (with rivers and docks) show from zoom 8. Each area is kept once viewed; this saves them all for use at sea.</p>
         <button id="save-world" type="button" class="secondary" hidden>Save the whole world's coastline</button>

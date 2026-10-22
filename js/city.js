@@ -207,7 +207,7 @@ const DEM = {
   tiles: ['dem://{z}/{x}/{y}'], // through the app's store (js/app.js)
   attribution: 'Terrain: Mapzen / AWS Open Data',
 };
-function ensureDem(map) {
+export function ensureDem(map) {
   if (!map.getSource('dem')) map.addSource('dem', DEM);
 }
 function peakImage() {
