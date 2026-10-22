@@ -868,6 +868,89 @@ $('#world').onclick = () => map.flyTo({ center: [70, 15], zoom: 1.6 });
 // Position, time and speed, with a course or waypoints; the weather where the
 // ship will be at +3, 6, 9, 12 and 24 hours.
 let voyage = null;
+// ------------------------------------------------------------------ updates
+// Settings → Check for updates. In the Android app: find the newest APK on
+// GitHub, download it with the phone's download manager and open the
+// installer. On the iPhone (the web app): fetch the newest version and reload.
+const RELEASES = 'https://api.github.com/repos/vaibhavma84-stack/World-Map.-/releases?per_page=30';
+const androidApp = window.WorldMapApp;
+const appVersion = androidApp ? androidApp.version() : null;
+const verNum = (v) => Number(String(v).replace(/^.*?1\./, '')) || 0;
+async function newestApk() {
+  const list = await fetch(RELEASES, { cache: 'no-store' }).then((r) => (r.ok ? r.json() : Promise.reject(new Error(r.status))));
+  return list
+    .filter((r) => !r.draft && !r.prerelease && /^world-map-1\.\d+$/.test(r.tag_name))
+    .map((r) => ({ version: r.tag_name.replace('world-map-', ''), when: r.published_at, apk: r.assets.find((a) => a.name.endsWith('.apk')) }))
+    .filter((r) => r.apk)
+    .sort((a, b) => verNum(b.version) - verNum(a.version))[0] || null;
+}
+let updateOffer = null;
+async function checkUpdate(quiet) {
+  const btn = $('#update-btn'), text = $('#update-text');
+  if (!androidApp) {
+    // Web app: the service worker brings the newest version; reload to it.
+    if (quiet) return;
+    btn.disabled = true;
+    text.textContent = 'Checking…';
+    try {
+      const reg = await navigator.serviceWorker?.getRegistration();
+      await reg?.update();
+      if (reg?.installing || reg?.waiting) { text.textContent = 'New version found: loading it…'; setTimeout(() => location.reload(), 2500); return; }
+      text.textContent = navigator.onLine === false ? 'No connection: try again when online.' : 'You have the latest version.';
+    } catch { text.textContent = 'Could not check: try again when online.'; }
+    btn.disabled = false;
+    return;
+  }
+  if (!quiet) { btn.disabled = true; text.textContent = 'Checking…'; }
+  try {
+    const n = await newestApk();
+    if (n && verNum(n.version) > verNum(appVersion)) {
+      updateOffer = n;
+      btn.textContent = `Download and install version ${n.version}`;
+      text.textContent = `This phone has version ${appVersion}. Version ${n.version} is ready (${Math.round(n.apk.size / 1e6)} MB, mobile data or Wi-Fi). It downloads in the background; then Android asks to install it.`;
+      $('#settings-btn')?.classList.add('has-update');
+    } else if (!quiet) {
+      text.textContent = `You have the latest version (${appVersion}).`;
+    }
+  } catch {
+    if (!quiet) text.textContent = 'Could not check: try again when online.';
+  }
+  btn.disabled = false;
+}
+function installUpdate() {
+  const btn = $('#update-btn'), text = $('#update-text');
+  const n = updateOffer;
+  androidApp.download(n.apk.browser_download_url, n.apk.name);
+  btn.disabled = true;
+  const poll = setInterval(() => {
+    const p = androidApp.progress();
+    if (p.startsWith('running')) {
+      btn.textContent = `Downloading version ${n.version}… ${p.split(' ')[1]}%`;
+      text.textContent = 'You can keep using the map; the download carries on in the background.';
+    } else if (p === 'done') {
+      clearInterval(poll);
+      btn.disabled = false;
+      btn.textContent = `Install version ${n.version}`;
+      text.textContent = 'Downloaded. Tap to install; your places, voyages and settings are kept.';
+      btn.onclick = () => {
+        const r = androidApp.install();
+        if (r === 'allow') text.textContent = 'Android asks to allow installing from World Map: switch it on, come back and tap Install again.';
+        else if (r !== 'ok') text.textContent = 'The download is missing: tap Check for updates to try again.';
+      };
+      btn.click();
+    } else if (p === 'failed') {
+      clearInterval(poll);
+      btn.disabled = false;
+      btn.textContent = 'Try the download again';
+      text.textContent = 'The download stopped (no signal?). Tap to try again.';
+    }
+  }, 1000);
+}
+$('#update-btn').onclick = () => (updateOffer && androidApp ? installUpdate() : checkUpdate(false));
+if (appVersion) $('#app-version').textContent = `Version ${appVersion}`;
+// Look once at start (online), quietly: Settings then shows the offer.
+if (androidApp && navigator.onLine !== false) setTimeout(() => checkUpdate(true), 8000);
+
 function hint(text) {
   $('#hint-text').textContent = text;
   $('#hint').hidden = !text;
@@ -1681,6 +1764,6 @@ if ('serviceWorker' in navigator && location.protocol === 'https:' && !/appasset
   const keep = ['wm-seamarks', 'wm-coast', 'wm-ofm', 'wm-world', 'wm-ofm-seen', 'wm-ofm-saved'];
   try {
     const name = (await caches.keys()).find((k) => k.startsWith('wm-') && !keep.includes(k) && !k.startsWith('wm-world'));
-    if (name) $('#app-version').textContent = `Version ${name.slice(3)}`;
+    if (name && !window.WorldMapApp) $('#app-version').textContent = `Version ${name.slice(3)}`;
   } catch { /* no caches here */ }
 })();

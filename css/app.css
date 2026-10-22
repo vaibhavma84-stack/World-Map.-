@@ -323,3 +323,6 @@ label.button { cursor: pointer; }
 .space-row label { display: flex; gap: 6px; align-items: center; margin-right: auto; }
 .row-end .secondary, .space-row .secondary, .sky-buttons .secondary, .quiz-options .secondary { width: auto; margin-bottom: 0; }
 .quiz-options .secondary { width: 100%; }
+#settings-btn.has-update { position: relative; }
+#settings-btn.has-update::after { content: ""; position: absolute; top: 6px; right: 6px; width: 10px; height: 10px; border-radius: 50%; background: #e53e3e; border: 2px solid #fff; }
+.update-box { margin: 10px 0; }

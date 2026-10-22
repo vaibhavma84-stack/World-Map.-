@@ -2,6 +2,12 @@ package com.worldmap.app;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.DownloadManager;
+import android.database.Cursor;
+import android.os.Build;
+import android.os.Environment;
+import android.provider.Settings;
+import android.webkit.JavascriptInterface;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -57,6 +63,7 @@ public class MainActivity extends Activity {
         s.setGeolocationEnabled(true);
         s.setAllowFileAccess(false);
         s.setAllowContentAccess(false);
+        web.addJavascriptInterface(new Updater(), "WorldMapApp");
 
         web.setWebViewClient(new WebViewClient() {
             @Override
@@ -152,6 +159,78 @@ public class MainActivity extends Activity {
                     range != null ? 206 : 200, range != null ? "Partial Content" : "OK", out, body);
         } catch (IOException | NumberFormatException e) {
             return null; // not in this build: the map keeps Natural Earth's coast
+        }
+    }
+
+    /**
+     * Updates from inside the app: the page finds the newest APK on GitHub,
+     * this downloads it with the phone's download manager (resumes if the
+     * signal drops, works on mobile data) and opens Android's installer.
+     */
+    private long downloadId = -1;
+
+    private class Updater {
+        @JavascriptInterface
+        public String version() {
+            try {
+                return getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
+            } catch (PackageManager.NameNotFoundException e) {
+                return "";
+            }
+        }
+
+        @JavascriptInterface
+        public void download(String url, String name) {
+            DownloadManager dm = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
+            if (downloadId >= 0) dm.remove(downloadId);
+            java.io.File old = new java.io.File(getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), name);
+            if (old.exists()) old.delete();
+            DownloadManager.Request r = new DownloadManager.Request(Uri.parse(url))
+                    .setTitle("World Map update")
+                    .setDescription(name)
+                    .setMimeType("application/vnd.android.package-archive")
+                    .setAllowedOverMetered(true)
+                    .setAllowedOverRoaming(true)
+                    .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)
+                    .setDestinationInExternalFilesDir(MainActivity.this, Environment.DIRECTORY_DOWNLOADS, name);
+            downloadId = dm.enqueue(r);
+        }
+
+        /** "running 45", "done", "failed", or "none". */
+        @JavascriptInterface
+        public String progress() {
+            if (downloadId < 0) return "none";
+            DownloadManager dm = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
+            try (Cursor c = dm.query(new DownloadManager.Query().setFilterById(downloadId))) {
+                if (c == null || !c.moveToFirst()) return "failed";
+                int status = c.getInt(c.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS));
+                if (status == DownloadManager.STATUS_SUCCESSFUL) return "done";
+                if (status == DownloadManager.STATUS_FAILED) return "failed";
+                long got = c.getLong(c.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR));
+                long total = c.getLong(c.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES));
+                return "running " + (total > 0 ? (got * 100 / total) : 0);
+            }
+        }
+
+        /** Opens the installer; first asks to allow installs from this app if needed. */
+        @JavascriptInterface
+        public String install() {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !getPackageManager().canRequestPackageInstalls()) {
+                startActivity(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + getPackageName())));
+                return "allow";
+            }
+            DownloadManager dm = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
+            Uri apk = dm.getUriForDownloadedFile(downloadId);
+            if (apk == null) return "missing";
+            Intent i = new Intent(Intent.ACTION_VIEW)
+                    .setDataAndType(apk, "application/vnd.android.package-archive")
+                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+            try {
+                startActivity(i);
+                return "ok";
+            } catch (ActivityNotFoundException e) {
+                return "missing";
+            }
         }
     }
 
