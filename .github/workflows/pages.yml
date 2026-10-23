@@ -41,6 +41,7 @@ jobs:
           enablement: true
 
       - name: Stage the site
+        id: stage
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -54,16 +55,14 @@ jobs:
           # A new version name makes phones fetch the new files.
           sed -i "s/const VERSION = '[^']*'/const VERSION = 'wm-${GITHUB_SHA::8}'/" _site/sw.js
           grep -q "wm-${GITHUB_SHA::8}" _site/sw.js
-          # GitHub Pages takes up to 1 GB: leave the world file out if it would
-          # not fit (the iPhone then keeps the harbour detail only).
-          # Leave out the rivers first, then the world coastline, if needed.
-          if [ "$(du -sm _site | cut -f1)" -gt 1000 ]; then
-            echo "::warning::Site over 1 GB; leaving out the rivers file"
-            rm -f _site/data/rivers.pmtiles
-          fi
-          if [ "$(du -sm _site | cut -f1)" -gt 1000 ]; then
-            echo "::warning::Site over 1 GB with the world coastline; leaving it out"
-            rm -f _site/data/land.pmtiles
+          # GitHub Pages takes up to 1 GB. Nothing is left out: if this version
+          # would not fit, it is not published, and the iPhone keeps the last
+          # version that did (new features then go to the Android app only).
+          size=$(du -sm _site | cut -f1)
+          echo "Site: ${size} MB of 1000"
+          if [ "$size" -gt 1000 ]; then
+            echo "::warning::iPhone version full (${size} MB of 1 GB): not published; the iPhone keeps its current version. Android gets this change."
+            echo "full=true" >> "$GITHUB_OUTPUT"
           fi
           # Name the iPhone's coastline cache after this file, so pieces kept from
           # an older file are dropped rather than mixed with the new one.
@@ -75,8 +74,10 @@ jobs:
           du -sh _site
 
       - uses: actions/upload-pages-artifact@v3
+        if: steps.stage.outputs.full != 'true'
         with:
           path: _site
 
       - id: deployment
+        if: steps.stage.outputs.full != 'true'
         uses: actions/deploy-pages@v4
