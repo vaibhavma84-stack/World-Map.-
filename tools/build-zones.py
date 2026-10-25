@@ -162,6 +162,20 @@ for f in mr('reg14_sox_pm'):
     ECA.append((name, g, 'SOx, PM' + (', NOx' if has_nox else ''), tier3 if has_nox else ''))
 ECA.append(('Mediterranean Sea ECA', MED, 'SOx, PM', ''))
 
+# National emission control areas (not MARPOL ECAs; each country's own rules).
+NATIONAL = []
+china = json.load(open(os.path.join(SRC, 'china-deca.json')))
+# The coastal area lies between the coast and the line of control points;
+# closed round through China inland (the land is cut away below).
+CHINA_INLAND = [(108.0, 21.6), (107.9, 22.3), (104.0, 24.0), (104.0, 41.5), (124.6, 41.5)]
+NATIONAL.append(('China coastal ECA (national)', Polygon(china['coastal'] + CHINA_INLAND),
+                 'Fuel sulphur 0.50% m/m max (China\'s own rules, since 1 January 2019; the global limit is now the same). '
+                 '0.10% in Hainan waters (since 2022) and in the inland river ECA: the Yangtze from Shuifu to the mouth of the Liuhe '
+                 'and the Xijiang from Nanning to Zhaoqing (since 2020). China MSA checks fuel samples and change-over records.'))
+NATIONAL.append(('Hainan waters ECA (China, national)', Polygon(china['hainan']),
+                 'Fuel sulphur 0.10% m/m max since 1 January 2022 (China\'s own rules). Chinese domestic ships built from 2022 '
+                 'with engines of 30 litres per cylinder or more: NOx Tier III here.'))
+
 # ================================================================ load lines
 def coastless(*legs):
     return poly(*legs)
@@ -296,6 +310,30 @@ def add(kind, name, geom, tol, **props):
 
 for name, g, which, tier3 in ECA:
     add('eca', name, g, 0.02, controls=which, tier3=tier3)
+korea = json.load(open(os.path.join(SRC, 'korea-eca.json')))
+KOREA_RULE = ('Korean port SOx ECA (national rules): fuel sulphur 0.10% m/m max (or a scrubber) from entering the area and '
+              'while inside it (since 1 January 2022); at berth or anchor since September 2020, changed over within 1 hour of '
+              'anchoring or berthing and kept until 1 hour before leaving. Log the date, time and position of each change-over '
+              '(keep the log 1 year) and carry a fuel change-over procedure.')
+# Each area is bounded by its lines and the coast: closed over the land (cut away below).
+KOREA_INLAND = {
+    'Busan': [(128.72, 35.25), (129.18, 35.25)],
+    'Busan (west)': [],
+    'Yeosu': [(127.75, 34.95), (127.75, 34.75)],
+    'Incheon': [(126.6, 36.9), (126.95, 36.85), (126.95, 37.6)],  # round Asan Bay (Dangjin, Pyeongtaek)
+}
+for key, extra in KOREA_INLAND.items():
+    label = {'Busan': 'Busan ECA (Korea)', 'Busan (west)': 'Busan west ECA (Korea)', 'Yeosu': 'Yeosu and Gwangyang ECA (Korea)',
+             'Incheon': 'Incheon, Pyeongtaek and Dangjin ECA (Korea)'}[key]
+    NATIONAL.append((label, Polygon(korea[key] + extra), KOREA_RULE))
+_u = korea['Ulsan']
+_lat0 = _u['centre'][1]
+NATIONAL.append(('Ulsan ECA (Korea)', Polygon([(_u['centre'][0] + _u['radius_nm'] / 60 / math.cos(math.radians(_lat0)) * math.cos(a / 36 * 2 * math.pi),
+                                                 _lat0 + _u['radius_nm'] / 60 * math.sin(a / 36 * 2 * math.pi)) for a in range(36)]),
+                 KOREA_RULE + ' The Ulsan area is 6 nm round 35°24′37″N 129°27′52″E.'))
+
+for name, g, rule in NATIONAL:
+    add('eca', name, g, 0.01, controls='SOx (national)', tier3='', rule=rule, national=1)
 for name, g, annexes, note in MARPOL:
     add('marpol', name, g, 0.02, annexes=annexes, rules=[RULES[a.strip()] for a in annexes.split(',')], note=note)
 for name, g, kind, periods, small, note in LOAD:

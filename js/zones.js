@@ -90,7 +90,7 @@ export function zonesCard(z, position) {
       parts.push(`<div class="card"><h3>Emission control area</h3>
         <div class="big">${esc(e.name)}</div>
         <div>Controls: ${esc(e.controls)}</div>
-        <div class="note">Fuel sulphur 0.10% m/m max (or an approved scrubber).${e.tier3 ? ` NOx Tier III for engines on ships built (keel laid) on or after ${e.tier3.slice(0, 4)}.` : ' Not a NOx (Tier III) area.'}</div>
+        <div class="note">${e.rule ? esc(e.rule) : `Fuel sulphur 0.10% m/m max (or an approved scrubber).${e.tier3 ? ` NOx Tier III for engines on ships built (keel laid) on or after ${e.tier3.slice(0, 4)}.` : ' Not a NOx (Tier III) area.'}`}</div>
       </div>`);
     }
   } else {
