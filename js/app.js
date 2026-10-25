@@ -636,9 +636,6 @@ maplibregl.addProtocol('dem', async (params, abort) => {
   const [z, x, y] = params.url.slice('dem://'.length).split('/').map(Number);
   return { data: await demTile(z, x, y, abort.signal) };
 });
-  }
-  return { data };
-});
 // The same terrain for the 3D view, with the seafloor raised to sea level so
 // the sea stays flat while mountains rise (terrarium: height = R*256 + G +
 // B/256 - 32768 metres; sea level is 128, 0, 0).
