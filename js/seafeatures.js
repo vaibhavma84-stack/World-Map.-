@@ -45,7 +45,7 @@ export async function addSeaFeatures(map, before, labelsBefore) {
   const [lights, seabed, cables, offshore] = await Promise.all(['lights', 'seabed', 'cables', 'offshore'].map(load));
   if (cables?.features?.length) {
     map.addSource('sea-cables', { type: 'geojson', data: cables, tolerance: 0.6 });
-    map.addLayer({ id: 'sea-telecom', type: 'line', source: 'sea-cables', minzoom: 1.5, filter: ['==', ['get', 'k'], 'telecom'], paint: { 'line-color': '#9f7aea', 'line-width': ['interpolate', ['linear'], ['zoom'], 2, 0.6, 8, 1.6], 'line-opacity': 0.75 } }, before);
+    map.addLayer({ id: 'sea-telecom', type: 'line', source: 'sea-cables', minzoom: 1.5, filter: ['==', ['get', 'k'], 'telecom'], paint: { 'line-color': '#9f7aea', 'line-width': ['interpolate', ['linear'], ['zoom'], 2, 0.4, 8, 1.2], 'line-opacity': 0.4 } }, before);
     map.addLayer({ id: 'sea-pipelines', type: 'line', source: 'sea-cables', minzoom: 4, filter: ['==', ['get', 'k'], 'pipeline'], paint: { 'line-color': '#c05621', 'line-width': ['interpolate', ['linear'], ['zoom'], 4, 0.7, 10, 2.2], 'line-dasharray': [3, 1.5] } }, before);
     map.addLayer({ id: 'sea-power', type: 'line', source: 'sea-cables', minzoom: 4, filter: ['==', ['get', 'k'], 'power'], paint: { 'line-color': '#d69e2e', 'line-width': ['interpolate', ['linear'], ['zoom'], 4, 0.6, 10, 1.8], 'line-dasharray': [1, 1.5] } }, before);
   }

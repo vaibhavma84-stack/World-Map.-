@@ -396,6 +396,10 @@ export function setupWeather(map, ui) {
     setOn(v) { on = v; store.set('on', v); render(); if (v) refresh(); },
     isOn: () => on,
     render,
+    // For the flow animation: the forecast kept on the phone, and the hour shown.
+    data: () => data,
+    step: () => step,
+    setStep(i) { step = Math.max(0, Math.min((data?.times?.length || 1) - 1, i)); ui.slider.value = String(step); render(); },
   };
 }
 

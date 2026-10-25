@@ -347,3 +347,10 @@ html[data-night="red"] img { filter: invert(1) hue-rotate(180deg); }
 .learn-tabs button { min-width: 0; }
 .light-card { display: flex; gap: 12px; align-items: center; }
 #light-show { width: 110px; height: 110px; border-radius: 12px; flex: none; }
+.flow-canvas { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
+.wx-flow { display: flex; gap: 6px; align-items: center; margin-top: 6px; }
+.wx-flow .secondary { width: auto; margin: 0; padding: 6px 10px; }
+.wx-flow select { font: inherit; padding: 6px; border-radius: 8px; border: 1px solid var(--line); }
+#flow-btn.active { background: var(--accent); color: #fff; }
+/* Space round the globe when zoomed out. */
+#map { background: radial-gradient(circle at 50% 45%, #0b1835 0%, #02040c 70%); }

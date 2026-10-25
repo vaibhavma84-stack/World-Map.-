@@ -12,6 +12,7 @@ import { setupVoyages } from './voyages.js';
 import { openLearn, ialaRegion } from './learn.js';
 import { openSpace } from './space.js';
 import { setupAis } from './ais.js';
+import { setupFlow } from './flow.js';
 import { addSeaFeatures, lightCard, playLight, seaFeatureCard, SEA_GROUPS } from './seafeatures.js';
 import { addDayNight, addSeaZones, setupNightMode, setupMeasure, shareView, EXTRA_GROUPS } from './extras.js';
 import { addDiscover, discoverCard, DISCOVER_GROUPS } from './discover.js';
@@ -625,12 +626,30 @@ async function demTile(z, x, y, signal) {
       try { const hit = await (await caches.open(name)).match(key); if (hit) return hit.arrayBuffer(); } catch { /* go on */ }
     }
   }
-  const data = await demFetch(z, x, y, signal);
+  let data;
+  try {
+    data = await demFetch(z, x, y, signal);
+  } catch (e) {
+    if (e?.name === 'AbortError') throw e;
+    return flatDem(); // offline and not saved: flat here rather than an error
+  }
   if (hasCaches) {
     const copy = data.slice(0);
     caches.open(OFM_SEEN).then((c) => c.put(key, new Response(copy))).catch(() => {});
   }
   return data;
+}
+// A terrain piece all at sea level (terrarium 128, 0, 0).
+let flatPng = null;
+async function flatDem() {
+  if (!flatPng) {
+    const c = new OffscreenCanvas(256, 256);
+    const g = c.getContext('2d');
+    g.fillStyle = 'rgb(128,0,0)';
+    g.fillRect(0, 0, 256, 256);
+    flatPng = await (await c.convertToBlob({ type: 'image/png' })).arrayBuffer();
+  }
+  return flatPng.slice(0);
 }
 maplibregl.addProtocol('dem', async (params, abort) => {
   const [z, x, y] = params.url.slice('dem://'.length).split('/').map(Number);
@@ -908,6 +927,7 @@ map.on('load', () => {
     reload: $('#wx-reload'), kinds: [...document.querySelectorAll('#wx-bar [data-kind]')],
   });
   voyage = setupVoyage(map, { openPanel, closePanel, $, hint, padding: clearOfPanel });
+  setupFlow(map, wx, { button: $('#flow-btn'), kindSelect: $('#flow-kind'), playButton: $('#flow-play') });
   myVoyages = setupVoyages(map, { openPanel, closePanel, findPorts: (t) => search(t).filter((p) => !p.place), countryName, flag });
   myPlaces = setupMyPlaces(map, { openPanel, closePanel, position });
   addSeaZones(map, 'borders');
@@ -968,6 +988,14 @@ function skyPlace() {
   return { lat: c.lat, lon: ((c.lng + 540) % 360) - 180, label: `Middle of the map (${position(c.lat, ((c.lng + 540) % 360) - 180)}). Set the ship's position for the sky at the ship.` };
 }
 setupNightMode($('#night-mode'), () => skyPlace());
+// The globe: the world as a ball when zoomed out (flat again close in).
+function applyGlobe() {
+  const on = store.get('globe', true);
+  try { map.setProjection({ type: on ? 'globe' : 'mercator' }); } catch { /* older map library */ }
+  $('#globe-toggle').checked = on;
+}
+$('#globe-toggle').onchange = (e) => { store.set('globe', e.target.checked); applyGlobe(); };
+if (map.loaded()) applyGlobe(); else map.once('load', applyGlobe);
 let space = null;
 function goToSpace() {
   if (space) return;

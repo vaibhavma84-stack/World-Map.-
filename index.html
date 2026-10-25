@@ -91,6 +91,7 @@
     <label><input type="checkbox" data-layer="telecom"> Submarine telecom cables</label>
     <label><input type="checkbox" data-layer="pipelines"> Submarine pipelines and power cables</label>
     <label><input type="checkbox" data-layer="offshore"> Oil and gas platforms, offshore wind farms</label>
+    <label><input type="checkbox" id="globe-toggle"> 🌍 Globe <small>the world as a ball when zoomed out</small></label>
     <label><input type="checkbox" data-layer="satellite"> 🛰️ Satellite view <small>whole world offline on Android; closer in online, kept once seen</small></label>
     <label><input type="checkbox" data-layer="ais"> 🚢 Ships from the ship's AIS <small>Android, on the bridge network · set up in Settings</small></label>
     <label><input type="checkbox" data-layer="daynight"> Day and night <small>the night side and twilight, moving live</small></label>
@@ -126,6 +127,11 @@
       <button id="wx-reload" class="icon" type="button" aria-label="Download again">
         <svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5"/></svg>
       </button>
+    </div>
+    <div class="wx-flow">
+      <button id="flow-btn" type="button" class="secondary">〰 Flow</button>
+      <select id="flow-kind" aria-label="What flows"><option value="wind">Wind</option><option value="waves">Waves</option><option value="current">Current</option></select>
+      <button id="flow-play" type="button" class="secondary">▶ Play 3 days</button>
     </div>
     <div id="wx-status" class="wx-status"></div>
   </div>
