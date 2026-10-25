@@ -1,0 +1,454 @@
+                                                                                   © INTERNATIONAL COUNCIL ON CLEAN TRANSPORTATION
+
+
+
+
+      POLICY UPDATE                                                                                             MARCH 2019
+
+
+
+
+ACTION PLAN FOR ESTABLISHING CHINA’S
+NATIONAL EMISSION CONTROL AREA
+
+                             Emissions from international shipping were responsible for approximately 61,000
+  ICCT POLICY UPDATES        premature deaths in 2015 (Anenberg et al. 2019), more than one-third of those in
+  SUMMARIZE                  China. In December 2015, China’s Ministry of Transport (MOT) released an action
+                             plan for establishing three regional domestic emission control areas (DECAs) to
+  REGULATORY
+                             control sulfur oxides (SOX ) and nitrogen oxides (NOX ) emissions from ships (Mao,
+  AND OTHER
+                             2016). The regional DECA plan established a review provision to be completed by
+  DEVELOPMENTS               the end of 2019 to determine if further actions are needed. Last December, almost 12
+  RELATED TO CLEAN           months ahead of schedule, MOT released an upgraded action plan for establishing
+  TRANSPORTATION
+                             a national DECA (China Ministry of Transport, 2018). This action plan marks China’s
+                             ambition to keep pace with world-class environmental regulations. This policy
+  WORLDWIDE.
+                             update provides an overview of the national DECA plan and compares it to the
+                             regional DECA as well as its likely successor—International Maritime Organization’s
+                             Emission Control Areas (IMO ECA).
+
+
+
+                             GEOGRAPHIC COVERAGE
+                             The national DECA expands the regional DECA’s three key port cluster regions to the
+                             entire coastline. Given China’s massive coastline, the national DECA removes regulatory
+                             differences between the regional emission control areas and potentially streamlines
+                             compliance and enforcement. The sea extent of the national DECA remains at 12
+                             nautical miles (nm), which extends to China’s territorial sea (Figure 1). Any further
+                             expansion of the emission control areas would be under the purview of the IMO and fall
+                             under the international ECA system. The North America ECA, for example, protects its
+                             coastal air quality out to as far as 200 nm from its coastline. The national DECA also
+                             includes two inland waterway systems—the Yangtze River and Pearl River—which are
+                             approximately 1800 miles and 500 miles in length, respectively.
+
+
+
+
+WWW.THEICCT.ORG      COMMUNICATIONS@THEICCT.ORG   |   BEIJING   |   BERLIN   |   BRUSSELS   |   SAN FRANCISCO    |   WASHINGTON
+ICCT POLICY UPDATE
+
+
+
+
+    Legend
+      North Sea and Baltic Sea SOX and future NOX ECA
+      North American and Caribbean SOX and NOX ECA
+        !"#$%&'()#*$%+&,!-
+      China  regional ECA
+        !"#$%&$%.#*$%+&,!-
+      China  national ECA
+
+
+Figure 1. Geographical coverage of existing IMO ECAs, China’s regional DECA, and China’s
+national DECA
+
+
+
+
+APPLICABILITY
+The regional DECA has the narrowest applicability, while the national DECA expands
+and pilots IMO ECA-equivalent standards for larger ships, or those whose main engine
+power is greater than 130 kW, that are engaged solely in domestic navigation.1 It also
+imposes requirements for the installation and use of shore power for multiple ship
+types. A comparison of the applicability of the regional DECA, national DECA, and IMO
+ECA is illustrated in Table 1.
+
+
+
+
+1       Domestic navigation refers to navigation within a country’s territorial waters. For China, the sea extent of the
+        territorial waters is generally 12 nautical miles from its coastal baseline.
+
+
+
+
+    2
+                 ACTION PLAN FOR ESTABLISHING CHINA’S NATIONAL EMISSION CONTROL AREA
+
+
+
+Table 1. Comparison of applicability of China’s regional DECA, China’s national DECA and IMO ECA2
+
+    Regulation      Pollutant                                      Applicability
+
+                                  All ships within region except fishing vessels, sporting vessels, and
+    China’s            SOX
+                                  naval ships.
+    regional
+    DECA
+                       NOX        Not regulated.
+
+                       SOX        All ships within region.
+
+                                  Each marine diesel engine with a power output of more than 130 kW2:
+                                  • Installed on an oceangoing ship or engine rebuilding was done on
+                                    or after 1/1/2000 needs to comply with IMO Tier I;
+    China’s                       • Installed on an oceangoing ship or engine rebuilding was done on
+    national                        or after 1/1/2011 needs to comply with IMO Tier II;
+    DECA               NOX        • Installed on a Chinese domestic ship or engine rebuilding was
+                                    done on or after 3/1/2015 needs to comply with IMO Tier II.
+                                  Each marine diesel engine with displacement more than 30L:
+                                  • Installed on a Chinese domestic ship on or after 1/1/2022 when
+                                    entering DECA inland region and 12 nm around Hainan Island needs
+                                    to comply with IMO Tier III.
+
+                       SOX        All ships within region.
+
+                                  Each marine diesel engine with a power output of more than 130 kW:
+                                  • Installed on an oceangoing ship or engine rebuilding was done on
+    IMO ECA
+                       NOX          or after 1/1/2016 needs to comply with IMO Tier III.
+                                  Ships used for emergency purposes, or ships solely used for
+                                  domestic navigation and subject to alternative domestic regulations
+                                  are exempt.
+
+Note: Engine rebuilding is defined as “overhaul an engine or to otherwise perform extensive service
+on the engine (or on a portion of the engine or engine system).” This definition refers to the definition
+in EPA marine engine regulation (U.S. EPA, 40 C.F.R. § 94.11).
+
+
+
+
+REQUIREMENTS
+SULFUR OXIDES
+As international shipping transitions to lower sulfur fuels, China is signaling its intention
+to tighten requirements above and beyond the minimum global standards. Sulfur
+requirements differ for ships depending on their dominant navigational areas. Figure 2
+summarizes the fuel sulfur requirements for oceangoing ships3. Like with the regional
+DECA, the national DECA confirms the early adoption of the IMO’s global sulfur cap
+of 0.5% m/m, which will be effective in 2020 globally. The national DECA also pilots a
+0.1% m/m sulfur requirement for all ships in the Yangtze and Pearl Rivers and for 12 nm
+around Hainan Island with different effective dates (Figure 2). In addition, it includes a
+revision provision that will likely expand the more stringent sulfur requirement to the
+entire national DECA coverage area starting in 2025.
+
+For other ships, the fuel sulfur requirements are consistent with those outlined in the
+domestic marine engine standards which can be summarized as follows:
+
+
+2    It is our understanding that the action plan refers to marine Category 3 engines whenever the “greater than
+     130 kW” condition is added. The China marine engine standards (GB15097-2016) defines Category 3 engines
+     as per-cylinder displacement greater than 5 liters.
+3    In China’s context, this term refers to ships engaged in international shipping and domestic coastal shipping.
+
+
+
+
+                                                                                                                  3
+  ICCT POLICY UPDATE
+
+
+
+  »» For larger river vessels4 and river-sea vessels, the current GB/T17411-2015 marine
+                         fuel standards apply, which is equivalent to the current ISO 8217 fuel standard. This
+                         standard is anticipated to be updated soon.
+  »» For other smaller river vessels, the China VI automobile diesel fuel standards apply,
+                         which require ultra-low-sulfur diesel fuel (<10 ppm).
+
+                                   Regional DECA                   ECA                            non-ECA
+                                   National DECA-inland            National DECA-Hainan           National DECA
+                           5
+
+                         4.5
+
+                           4
+                                                                 2012.1.1
+                         3.5
+Fuel sulfur content, %
+
+
+
+
+                           3
+
+                         2.5
+
+                           2
+
+                         1.5
+                                                      2010.1.1
+                           1
+                                                                                                      2020.3.1
+                                                                                 2016.1.1     2019.1.1
+                         0.5
+                          0.1                                                2015.1.1              2020.1.1 2022.1.1
+                           0
+
+  Figure 2. Comparison of SOX requirements of the regional DECA, national DECA, IMO ECA and
+  non-ECA for oceangoing ships only
+
+  Note: The regional DECA, lowering fuel sulfur content requirement to 0.5% m/m since 2016, only
+  enforced the limits for ships at berth until the end of 2018.
+
+
+
+  NITROGEN OXIDES
+  The regional DECA does not impose NOX requirements. The national DECA is a
+  significant improvement in that it not only adds a NOX requirement, but also compels
+  larger vessels engaged solely in domestic navigation to comply with IMO Tier III
+  requirements (Table 2 and Figure 3). In 2015, merchant vessels contributed about 14% of
+  all NOx emissions in the coastal region that extends 100 nautical miles (nm) from China’s
+  baseline (Mao & Rutherford, 2018). This provision in the national DECA demonstrates
+  that the country is taking significant efforts reduce NOX emissions from ships.
+
+
+
+
+  4                      The size of the ships is not the determinant for fuel quality compliance. Ships that need to burn marine fuel
+                         oil should use compliant fuel according to GB/T17411-2015; ships that used to burn regular diesel should use
+                         compliant fuel according to China VI automobile diesel fuel standards.
+
+
+
+
+             4
+                            ACTION PLAN FOR ESTABLISHING CHINA’S NATIONAL EMISSION CONTROL AREA
+
+
+
+Table 2. Comparison of NOX requirements in ECAs, China’s national DECA and non-ECA regions
+
+                                                                                    Build Year
+                                      2000-2010    2011    2012    2013     2014   2015   2016     2017    2018      2019      2020   2021       2022
+
+   ECA, North America
+                                         Tier I                   Tier II                                           Tier III
+   and Caribbean Sea
+
+   ECA, North Sea and
+                                         Tier I                                      Tier II                                            Tier III
+   Baltic Sea
+
+   China national DECA, ships                                                                                                                    Tier
+                                                          N/A                                             Tier II
+   for domestic navigation                                                                                                                        III
+
+   China national DECA,
+                                         Tier I                                                Tier II
+   other ships
+
+   non-ECA                               Tier I                                                Tier II
+
+
+
+                   18
+
+                   16
+
+                   14
+                                                  Tier I, since 2000
+                   12
+NOX Limit, g/kWh
+
+
+
+
+                   10
+                                                                     Tier II, since 2011
+                   8
+
+                   6
+
+                   4
+                                                                     Tier III, ECA only
+                   2
+
+                   0
+                        0          500                    1000                     1500                   2000                        2500
+                                                                  Engine RPM
+
+Figure 3. Comparison of IMO NOX requirements by engine tier
+
+
+
+
+SHOREPOWER
+Unlike IMO’s ECA regulations, the national DECA includes a set of progressive
+mandates on shore power application to control ship emissions at berth. In design, it
+is similar to at-berth regulations enforced by California Air Resources Board (CARB),
+only less prescriptive. This special requirement highlights the country’s desire to
+promote shore power and the general trend of electrification in ports, but it’s not
+yet clear how enforceable the regulations are at this stage. For example, CARB also
+enforces limits on hours of operation without plugging into shore power for ships
+berthing at regulated ports. But feedback received during regulatory review stated
+that this limit was hard to enforce (CARB, 2017). The mandates are described in more
+detail in Table 3.
+
+
+
+
+                                                                                                                                             5
+ICCT POLICY UPDATE
+
+
+
+Table 3. Summary of the shore power requirements under the national DECA
+
+        Flag and                   Effective
+        ship use     Ship age        date             Ship/engine types                   Requirement
+
+                                                 Applicable ship types:
+                                                 • Government vessels
+                                   Built after
+                                                 • River vessels (except for
+                                   1/1/2019
+                                                   liquid cargo carriers)
+                                                 • River-sea vessels
+
+                   Newbuild                      Applicable ship types:           Need to install shore power
+                                                 • Container ships
+                                                 • Cruise ships
+                                   Built after
+                                                 • Roll-on/roll-off passenger
+                                   1/1/2020
+                                                   ships
+                                                 • Passenger ships >3000 gt
+                                                 • Bulk carriers >50000 gt
+
+    China-                                                                        Need to use shore power
+    flagged        Existing                                                       while berthing over three
+    ships,         fleet                         Applicable ship types:           hours in coastal ports (or
+                                   Effective
+    domestic       equipped                      All except for liquid cargo      two hours in river ports)
+                                   7/1/2019
+    navigation     with shore                    carriers                         where shore power is
+                   power                                                          available unless equivalent
+                                                                                  measuresb are used
+
+                                                 Applicable ship typesa:
+                                                 • Government vessels
+                                                 • River vessels (except for
+                                                   liquid cargo carriers)         Need to install and use
+                   Existing                                                       shore power while berthing
+                                                 • River-sea vessels
+                   fleet                                                          over three hours in coastal
+                                   Effective     • Container ships
+                   without                                                        ports (or two hours in river
+                                   1/1/2022
+                   shore                         • Cruise ships                   ports) where shore power is
+                   power                                                          available unless equivalent
+                                                 • Roll-on/roll-off passenger
+                                                                                  measuresb are used
+                                                   ships
+                                                 • Passenger ships >3000 gt
+                                                 • Bulk carriers >50000 gt
+
+                                   Built after
+                   New build
+                                   1/1/2021                                       Need to install and use shore
+                                                                                  power while berthing over
+                   Existing                      Applicable ship types:           three hours in ports where
+                   ships                         Cruise ships                     shore power is available
+                                   Effective
+                   without                                                        unless equivalent measuresb
+    All ships                      1/1/2021
+                   shore                                                          are used
+    berthing
+                   power
+    at Chinese
+    ports                                                                         Need to use shore power
+                   Existing
+                                                                                  while berthing over three
+                   fleet                         Applicable ship types:
+                                   Effective                                      hours in coastal ports where
+                   equipped                      All except for liquid cargo
+                                   7/1/2019                                       shore power is available
+                   with shore                    carriers
+                                                                                  unless equivalent measuresb
+                   power
+                                                                                  are used
+a
+    Only applicable when these ships have >130 kW engines that fail to meet with IMO Tier II regulations
+b
+    The official document lists suggestive measures, including using clean or new energy sources, onboard
+     batteries, and auxiliary engine shutdown. However, it offers no guidance to demonstrate equivalency.
+
+
+
+
+    6
+            ACTION PLAN FOR ESTABLISHING CHINA’S NATIONAL EMISSION CONTROL AREA
+
+
+
+CONCLUSIONS
+The national DECA makes meaningful upgrades to the regional DECA and builds in
+mechanisms for a potential upgrade to an IMO ECA in the next five years. In the Action
+Plan for Diesel Truck Pollution Control (China Ministry of Ecology and Environment,
+2019) released in January 2019, research was requested on the delineation and potential
+control measures of an “International Emission Control Area” equivalent to an IMO ECA.
+Evaluation and monitoring of the existing measures, as well as feasibility studies of
+potential next steps, are needed to boost internal confidence and to demonstrate the
+country’s determination and capability to the international community. To inform future
+upgrades of the national DECA, the ICCT will soon publish an analysis of the cost-
+effectiveness of a potential Chinese ECA in the Greater Pearl River Delta region.
+
+
+
+REFERENCES
+Anenberg, S., Miller, J., Henze, D., and Minjares, R. (2019). A global snapshot of the air
+  pollution-related health impacts of transportation sector emissions in 2010 and
+  2015. Retrieved from the International Council on Clean Transportation https://
+  www.theicct.org/publications/health-impacts-transport-emissions-2010-2015.
+
+California Air Resources Board (2008). Facts about at-berth ocean-going vessels
+   regulation. Retrieved from http://wpci.iaphworldports.org/data/docs/onshore-
+   power-supply/library/1266571852_shorepowerfactsheet.pdf.
+
+California Air Resources Board (2017). Public workshop to discuss ships at-berth
+   regulation. Retrieved from https://www.arb.ca.gov/ports/shorepower/
+   meetings/082817/082817pres.pdf.
+
+China Ministry of Ecology and Environment (2016). Limits and measurement
+  methods for exhaust pollutants from marine engines (China I, II). Retrieved
+  from http://kjs.mee.gov.cn/hjbhbz/bzwb/dqhjbh/dqydywrwpfbz/201608/
+  W020160830363480359441.pdf.
+
+China Ministry of Ecology and Environment (2019). Action plan for diesel truck pollution
+  control. Retrieved from http://www.mee.gov.cn/xxgk2018/xxgk/xxgk03/201901/
+  t20190104_688587.html.
+
+China Ministry of Transport (2018). Action plan to establish a national emission
+  control area for ship emission control. Retrieved from http://www.mot.gov.cn/
+  xiazaizhongxin/ziliaoxiazai/201901/P020190108523315116731.pdf.
+
+Mao, X (2016). Action plan for establishing ship emission control zones in China. Retrieved
+  from the International Council on Clean Transportation https://www.theicct.org/
+  publications/action-plan-establishing-ship-emission-control-zones-china.
+
+Mao, X. and Rutherford, D. (2018). NOX emissions from merchant vessels in coastal China:
+  2015 and 2030. Retrieved from the International Council on Clean Transportation
+  https://www.theicct.org/publications/nox-emissions-merchant-vessels-coastal-
+  china-2015-and-2030.
+
+United States Environmental Protection Agency. Requirements for rebuilding certified
+  engines. 40 C.F.R. § 94.11. Retrieved from https://www.ecfr.gov/cgi-bin/text-idx?SI
+  D=a8a469920cf35098c9f7bcd496ab758a&mc=true&node=pt40.22.94&rgn=div5.
+
+
+
+
+                                                                                             7
+
