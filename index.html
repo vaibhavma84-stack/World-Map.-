@@ -44,6 +44,9 @@
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
     </button>
     <button id="btn-3d" class="icon round label" type="button" aria-label="3D view" aria-pressed="false">3D</button>
+    <button id="measure-btn" class="icon round" type="button" aria-label="Measure distance and course">
+      <svg viewBox="0 0 24 24"><path d="M3 17L17 3l4 4L7 21z"/><path d="M7 13l2 2M10 10l2 2M13 7l2 2"/></svg>
+    </button>
     <button id="more-btn" class="icon round" type="button" aria-label="More: night sky, my voyages, learn, space" aria-haspopup="true">
       <svg viewBox="0 0 24 24"><path d="M12 3l2.4 5.6 6.1.5-4.6 4 1.4 6-5.3-3.2-5.3 3.2 1.4-6-4.6-4 6.1-.5z"/></svg>
     </button>
@@ -56,6 +59,7 @@
     <button type="button" data-more="sky">🌌 Night sky <small>stars, planets, Sun and Moon at the ship</small></button>
     <button type="button" data-more="space">🌍 Earth, Moon and Sun from space</button>
     <button type="button" data-more="voyages">🧭 My voyages <small>ports called, on the map</small></button>
+    <button type="button" data-more="share">📷 Share or save this view <small>as a picture</small></button>
     <button type="button" data-more="learn">📘 Learn <small>lights, shapes, sounds, buoys, MARPOL, quiz</small></button>
   </div>
 
@@ -80,6 +84,8 @@
     <p class="layers-head">Places to go <small>Mumbai · tap for details and photos</small></p>
     <div id="poi-switches"></div>
     <p class="layers-head">Map</p>
+    <label><input type="checkbox" data-layer="daynight"> Day and night <small>the night side and twilight, moving live</small></label>
+    <label><input type="checkbox" data-layer="seazones"> Time zones at sea and the date line</label>
     <label><input type="checkbox" data-layer="depth"> Ocean depths and seafloor <small>lighter is shallower · depths offline, seafloor shading online or saved</small></label>
     <label><input type="checkbox" data-layer="roads"> Major roads and cities <small>offline; road numbers when zoomed in · online, kept once seen</small></label>
     <label><input type="checkbox" data-layer="tss"> Traffic separation and routes <small>TSS, deep-water and recommended routes · offline</small></label>
@@ -141,6 +147,14 @@
       </label>
       <label>Ship's clock
         <select id="ship-offset"></select>
+      </label>
+      <label>Map at night
+        <select id="night-mode">
+          <option value="off">Day colours</option>
+          <option value="auto">Dark from sunset to sunrise (automatic)</option>
+          <option value="dark">Dark</option>
+          <option value="red">Red, to keep night vision on the bridge</option>
+        </select>
       </label>
       <div class="save-coast">
         <button id="save-all" type="button" class="primary wide" hidden>Download everything for use at sea</button>

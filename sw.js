@@ -6,7 +6,7 @@ const FONTS = ['OpenSans-Regular', 'OpenSans-Semibold', 'OpenSans-Italic', 'Open
 const RANGES = ['0-255', '256-511', '512-767', '8192-8447'];
 const FILES = [
   './', 'index.html', 'manifest.webmanifest', 'css/app.css',
-  'js/app.js', 'js/countries.js', 'js/languages.js', 'js/time.js', 'js/weather.js', 'js/currents.js', 'js/voyage.js', 'js/zones.js', 'js/city.js', 'js/places.js', 'js/myplaces.js', 'js/sky.js', 'js/voyages.js', 'js/learn.js', 'js/space.js', 'js/discover.js', 'vendor/astronomy.min.js', 'data/stars.json',
+  'js/app.js', 'js/countries.js', 'js/languages.js', 'js/time.js', 'js/weather.js', 'js/currents.js', 'js/voyage.js', 'js/zones.js', 'js/city.js', 'js/places.js', 'js/myplaces.js', 'js/sky.js', 'js/voyages.js', 'js/learn.js', 'js/space.js', 'js/discover.js', 'js/extras.js', 'vendor/astronomy.min.js', 'data/stars.json',
   'vendor/maplibre-gl.js', 'vendor/maplibre-gl.css',
   'data/countries.json', 'data/borders.json', 'data/labels.json', 'data/rivers.json', 'data/river-names.json',
   'data/lakes.json', 'data/ports.json', 'data/details.json', 'data/terminals.json', 'data/tss.json', 'data/zones.json', 'data/roads.json', 'data/cities.json', 'data/city-extras.json', 'data/discover.json', 'data/rates.json',

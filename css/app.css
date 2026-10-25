@@ -326,3 +326,11 @@ label.button { cursor: pointer; }
 #settings-btn.has-update { position: relative; }
 #settings-btn.has-update::after { content: ""; position: absolute; top: 6px; right: 6px; width: 10px; height: 10px; border-radius: 50%; background: #e53e3e; border: 2px solid #fff; }
 .update-box { margin: 10px 0; }
+
+/* Night mode: the whole screen dark, or red for night vision. */
+html[data-night="dark"] body { filter: invert(0.92) hue-rotate(180deg) brightness(0.9); background: #000; }
+html[data-night="dark"] img, html[data-night="dark"] .space, html[data-night="dark"] #sky-canvas { filter: invert(1) hue-rotate(180deg); }
+html[data-night="red"] body { filter: invert(0.95) hue-rotate(180deg) brightness(0.55) sepia(1) saturate(6) hue-rotate(-40deg); background: #000; }
+html[data-night="red"] img { filter: invert(1) hue-rotate(180deg); }
+#measure-btn.active { background: #d53f8c; color: #fff; }
+#measure-btn.active svg { stroke: #fff; }

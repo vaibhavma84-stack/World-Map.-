@@ -3,6 +3,9 @@ package com.worldmap.app;
 import android.Manifest;
 import android.app.Activity;
 import android.app.DownloadManager;
+import android.content.ContentValues;
+import android.provider.MediaStore;
+import java.io.OutputStream;
 import android.database.Cursor;
 import android.os.Build;
 import android.os.Environment;
@@ -209,6 +212,27 @@ public class MainActivity extends Activity {
                 long got = c.getLong(c.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR));
                 long total = c.getLong(c.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES));
                 return "running " + (total > 0 ? (got * 100 / total) : 0);
+            }
+        }
+
+        /** Saves a picture of the map in Pictures/World Map and offers to share it. */
+        @JavascriptInterface
+        public String shareImage(String base64) {
+            try {
+                byte[] png = android.util.Base64.decode(base64, android.util.Base64.DEFAULT);
+                ContentValues v = new ContentValues();
+                v.put(MediaStore.Images.Media.DISPLAY_NAME, "World Map " + System.currentTimeMillis() + ".png");
+                v.put(MediaStore.Images.Media.MIME_TYPE, "image/png");
+                if (Build.VERSION.SDK_INT >= 29) v.put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/World Map");
+                Uri uri = getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, v);
+                if (uri == null) return "failed";
+                try (OutputStream o = getContentResolver().openOutputStream(uri)) { o.write(png); }
+                Intent send = new Intent(Intent.ACTION_SEND).setType("image/png")
+                        .putExtra(Intent.EXTRA_STREAM, uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                startActivity(Intent.createChooser(send, "Share the map").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                return "ok";
+            } catch (Exception e) {
+                return "failed";
             }
         }
 

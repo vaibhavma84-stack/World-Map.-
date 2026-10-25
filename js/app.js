@@ -11,6 +11,7 @@ import { openSky } from './sky.js';
 import { setupVoyages } from './voyages.js';
 import { openLearn, ialaRegion } from './learn.js';
 import { openSpace } from './space.js';
+import { addDayNight, addSeaZones, setupNightMode, setupMeasure, shareView, EXTRA_GROUPS } from './extras.js';
 import { addDiscover, discoverCard, DISCOVER_GROUPS } from './discover.js';
 import {
   offsetMinutes, zonedToUtc, formatOffset, formatSpan, clock, longDate, shipClock,
@@ -298,11 +299,13 @@ map.getCanvas().addEventListener('mouseleave', () => { $('#coords').textContent 
 
 // Tap a port, or near one: fingers are wider than dots.
 let myPlaces = null;
+let measure = null;
 let myVoyages = null;
 let discoverPlaces = [];
 let cityPlaces = [];
 map.on('click', (e) => {
   if (myPlaces?.justHeld()) return;
+  if (measure?.click(e)) return;
   if (voyage?.click(e)) return;
   const pad = 12;
   const box = [[e.point.x - pad, e.point.y - pad], [e.point.x + pad, e.point.y + pad]];
@@ -401,8 +404,9 @@ const LAYER_GROUPS = {
   myplaces: ['my-places'],
   voyages: ['voyages-legs', 'voyages-calls'],
   ...DISCOVER_GROUPS,
+  ...EXTRA_GROUPS,
 };
-const shown = { depth: true, myplaces: true, voyages: true, wrecks: true, history: true, marinelife: true, hills: true, ...Object.fromEntries(Object.keys(PLACE_GROUPS).map((g) => [g, true])), cityroads: true, cityrail: true, citybuildings: true, citygreen: true, cityplaces: true, roads: true, eca: true, marpol: true, loadline: true, tss: true, seamarks: true, osmwater: true, terminals: true, currents: true, rivers: true, grid: true, weather: false, ...store.get('layers', {}) };
+const shown = { daynight: true, seazones: true, depth: true, myplaces: true, voyages: true, wrecks: true, history: true, marinelife: true, hills: true, ...Object.fromEntries(Object.keys(PLACE_GROUPS).map((g) => [g, true])), cityroads: true, cityrail: true, citybuildings: true, citygreen: true, cityplaces: true, roads: true, eca: true, marpol: true, loadline: true, tss: true, seamarks: true, osmwater: true, terminals: true, currents: true, rivers: true, grid: true, weather: false, ...store.get('layers', {}) };
 let wx = null;
 // Only change what differs: each change makes the map reload that layer's
 // source, and a reload racing a download left the city detail empty.
@@ -830,6 +834,9 @@ map.on('load', () => {
   voyage = setupVoyage(map, { openPanel, closePanel, $, hint, padding: clearOfPanel });
   myVoyages = setupVoyages(map, { openPanel, closePanel, findPorts: (t) => search(t).filter((p) => !p.place), countryName, flag });
   myPlaces = setupMyPlaces(map, { openPanel, closePanel, position });
+  addSeaZones(map, 'borders');
+  addDayNight(map, PORT_LAYERS[0]);
+  measure = setupMeasure(map, { button: $('#measure-btn'), openPanel, closePanel, position });
   myVoyages.onPlacesLoaded(() => myPlaces.refresh());
   addDiscover(map, 'voyages-legs').then((f) => { discoverPlaces = f || []; applyLayers(); });
   $('#add-place').onclick = () => { layersBox.hidden = true; myPlaces.addAtCentre(); };
@@ -865,6 +872,7 @@ function skyPlace() {
   const c = map.getCenter();
   return { lat: c.lat, lon: ((c.lng + 540) % 360) - 180, label: `Middle of the map (${position(c.lat, ((c.lng + 540) % 360) - 180)}). Set the ship's position for the sky at the ship.` };
 }
+setupNightMode($('#night-mode'), () => skyPlace());
 let space = null;
 function goToSpace() {
   if (space) return;
@@ -880,6 +888,7 @@ for (const b of moreBox.querySelectorAll('[data-more]')) {
     if (what === 'space') goToSpace();
     if (what === 'voyages') myVoyages?.show();
     if (what === 'learn') openLearn({ openPanel });
+    if (what === 'share') shareView(map);
   };
 }
 // Zooming out past the whole world goes on into space.

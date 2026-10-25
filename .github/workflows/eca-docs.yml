@@ -1,0 +1,53 @@
+name: ECA source documents
+
+# Fetches the official documents for national emission control areas
+# (China's DECA scheme, South Korea's port SOx ECAs) into
+# tools/sources/eca-docs/ as text, to build their boundaries from.
+on:
+  push:
+    paths:
+      - .github/workflows/eca-docs.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get install -y -q poppler-utils >/dev/null
+      - name: Fetch
+        run: |
+          set +e
+          D=tools/sources/eca-docs
+          mkdir -p $D
+          UA="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36"
+          get() { curl -sSL -m 120 -A "$UA" -o "$D/$1" "$2"; echo "$1: $? $(stat -c %s "$D/$1" 2>/dev/null) bytes $(file -b "$D/$1" | cut -c1-40)"; }
+          get china-msa-2018.pdf "https://www.msa.gov.cn/public/documents/document/mtex/mzm1/~edisp/20181219111335546.pdf"
+          get china-fareast.bin "http://www.fareastchina.com/download/304"
+          get china-egcsa.html "https://www.egcsa.com/regulatory/china-deca/"
+          get china-icct-2019.pdf "https://theicct.org/wp-content/uploads/2021/06/DECA_China_policy_update_20190304.pdf"
+          get korea-mof.html "https://www.mof.go.kr/doc/ko/selectDoc.do?docSeq=35176&menuSeq=971&bbsSeq=10"
+          get korea-upa.html "https://www.upa.or.kr/portal/board/post/view.do?bcIdx=676&mid=0601000000&idx=2801"
+          get korea-law.html "https://www.law.go.kr/LSW/admRulLsInfoP.do?admRulNm=%ED%99%A9%EC%82%B0%ED%99%94%EB%AC%BC%20%EB%B0%B0%EC%B6%9C%EA%B7%9C%EC%A0%9C%ED%95%B4%EC%97%AD%20%EC%A7%80%EC%A0%95%20%EA%B3%A0%EC%8B%9C"
+          get korea-lr.bin "https://info.lr.org/l/12702/2020-05-06/8z5p3n"
+          for f in $D/*; do
+            case "$(file -b "$f")" in
+              PDF*) pdftotext -layout "$f" "$f.txt" ;;
+              *HTML*|*XML*) python3 -c "import re,sys,html;t=open(sys.argv[1],errors='ignore').read();t=re.sub(r'(?is)<(script|style).*?</\1>','',t);t=re.sub(r'<[^>]+>',' ',t);print(re.sub(r'[ \t]+',' ',html.unescape(t)))" "$f" > "$f.txt" ;;
+            esac
+          done
+          # Links to attachments on the Korean pages.
+          grep -oiE 'href="[^"]*(download|attach|file)[^"]*"' $D/korea-*.html | head -20
+          ls -la $D
+      - name: Save
+        run: |
+          git add tools/sources/eca-docs
+          git diff --cached --quiet && exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "ECA source documents"
+          git pull --rebase -q
+          git push
