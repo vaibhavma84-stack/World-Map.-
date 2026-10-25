@@ -3,6 +3,8 @@
 // (Regions A and B), MARPOL and ballast water in brief, and a quiz.
 // A summary for study: the conventions themselves are the authority.
 
+import { SOCIETIES, OTHER_SOCIETIES, SURVEYS, CLASS_NOTES, CERT_GROUPS, CERT_NOTES } from './learn-ship.js';
+
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 // ---------------------------------------------------------- lights and shapes
@@ -157,10 +159,10 @@ function question() {
   };
 }
 
-export function openLearn({ openPanel }) {
-  let tab = 'lights';
+export function openLearn({ openPanel, tab: first }) {
+  let tab = first || 'lights';
   let score = 0, asked = 0;
-  const tabs = [['lights', 'Lights & shapes'], ['sound', 'Sound signals'], ['buoys', 'Buoyage'], ['marpol', 'MARPOL'], ['quiz', 'Quiz']];
+  const tabs = [['lights', 'Lights & shapes'], ['sound', 'Sound signals'], ['buoys', 'Buoyage'], ['marpol', 'MARPOL'], ['class', 'Class'], ['certs', 'Certificates'], ['quiz', 'Quiz']];
   const body = () => {
     if (tab === 'lights') {
       return VESSELS.map((v) => `<div class="card learn-card"><div class="learn-pics">${lightsSvg(v.sig)}${shapeSvg(v.day.length ? v.day : v.dayAlt || [])}</div>
@@ -174,6 +176,20 @@ export function openLearn({ openPanel }) {
       return `<div class="card"><p><b>Region A</b>: Europe, Africa, Asia (except Japan, Korea and the Philippines), Australia. <b>Region B</b>: the Americas, Japan, Korea and the Philippines, where port and starboard colours are the other way round. A country’s card on the map says which region it uses.</p></div>
         ${MARKS.map((m) => `<div class="card learn-card"><div class="learn-pics">${markSvg(m)}</div><div><h3>${esc(m.n)}</h3><p>${esc(m.note)}</p><div class="note">Light: ${esc(m.light)}</div></div></div>`).join('')}`;
     }
+    if (tab === 'class') {
+      return `<div class="card"><h3>IACS members</h3><table class="facts learn-table cls"><tr><th>Society</th><th>Country</th><th>Since</th></tr>
+        ${SOCIETIES.map(([n, a, c, y, note]) => `<tr><td><b>${esc(a)}</b> ${esc(n)}<div class="note">${esc(note)}</div></td><td>${esc(c)}</td><td>${y}</td></tr>`).join('')}</table></div>
+        <div class="card"><h3>Other societies</h3><table class="facts learn-table cls">${OTHER_SOCIETIES.map(([n, a, c, note]) => `<tr><td><b>${esc(a)}</b> ${esc(n)}${note ? `<div class="note">${esc(note)}</div>` : ''}</td><td>${esc(c)}</td></tr>`).join('')}</table>
+        <div class="note">Not members of IACS; some flags accept them as Recognised Organisations.</div></div>
+        <div class="card"><h3>Class surveys</h3>${SURVEYS.map(([n, when, what]) => `<div class="cert"><b>${esc(n)}</b><div class="cert-valid">${esc(when)}</div><div>${esc(what)}</div></div>`).join('')}</div>
+        <div class="card"><h3>Good to know</h3><ul class="learn-list">${CLASS_NOTES.map((t) => `<li>${esc(t)}</li>`).join('')}</ul></div>`;
+    }
+    if (tab === 'certs') {
+      return `<div class="card"><p>Certificates and documents of a <b>UK-flag ship</b> (Maritime and Coastguard Agency, MCA): what each is for, how long it is valid and who issues it. For study, not a checklist.</p></div>
+        ${CERT_GROUPS.map(([group, list]) => `<div class="card"><h3>${esc(group)}</h3>${list.map(([n, valid, by, note]) => `<div class="cert"><b>${esc(n)}</b>
+          <div class="cert-valid">Validity: ${esc(valid)}</div><div class="cert-by">Issued by: ${esc(by)}</div><div>${esc(note)}</div></div>`).join('')}</div>`).join('')}
+        <div class="card"><h3>Good to know</h3><ul class="learn-list">${CERT_NOTES.map((t) => `<li>${esc(t)}</li>`).join('')}</ul></div>`;
+    }
     if (tab === 'marpol') {
       return `${MARPOL.map(([h, t]) => `<div class="card"><h3>${esc(h)}</h3><p>${esc(t)}</p></div>`).join('')}
         <div class="note">In brief, for revision. Tap the sea on the map to see the ECA, special area and load line zone there. The conventions and flag state rules are the authority.</div>`;
@@ -185,7 +201,7 @@ export function openLearn({ openPanel }) {
       <div class="row-end"><span class="note">Score ${score} / ${asked}</span><button type="button" class="primary" id="quiz-next" hidden>Next question</button></div></div>`;
   };
   const render = () => {
-    openPanel(`<h1>Learn</h1><p class="sub">Rules of the road, buoyage and MARPOL, for revision.</p>
+    openPanel(`<h1>Learn</h1><p class="sub">Rules of the road, buoyage, MARPOL, class and certificates, for revision.</p>
       <div class="sky-views learn-tabs" role="tablist">${tabs.map(([k, l]) => `<button type="button" data-tab="${k}" class="${k === tab ? 'active' : ''}">${l}</button>`).join('')}</div>
       <div class="cards">${body()}</div>`);
     for (const b of document.querySelectorAll('[data-tab]')) b.onclick = () => { tab = b.dataset.tab; render(); };

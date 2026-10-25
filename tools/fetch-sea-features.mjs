@@ -86,13 +86,14 @@ function lightOf(t) {
 }
 async function lights() {
   console.log('Lights');
-  const els = await bands((b) => `[out:json][timeout:600];(node["seamark:type"~"^(light_major|lighthouse)$"]${b};node["man_made"="lighthouse"]["seamark:light:character"]${b};);out tags;`);
+  const els = await bands((b) => `[out:json][timeout:600];(node["seamark:type"~"^(light_major|light_minor|lighthouse)$"]${b};node["man_made"="lighthouse"]${b};);out body;`, 20);
   if (!els) return null;
   const out = [];
   for (const el of els) {
     const t = el.tags || {};
     const l = lightOf(t);
     const f = point(el, { n: t['seamark:name'] || t['name:en'] || t.name || '', ...(l ? { ch: l.text, c: l.c, gr: l.gr, col: l.col, p: l.p, seq: l.seq } : {}), maj: t['seamark:type'] === 'light_minor' ? 0 : 1 });
+    if (f && !f.properties.maj) { delete f.properties.n; if (!l) continue; }
     if (f && (l || f.properties.n)) out.push(f);
   }
   return out;
@@ -175,7 +176,7 @@ async function seabed() {
   }
 }
 
-const only = process.argv[2];
+const only = process.argv[2] || process.env.ONLY;
 if (!only || only === 'seabed') keep('seabed', await seabed(), 50);
 if (!only || only === 'cables') keep('cables', await cables(), 100);
 if (!only || only === 'offshore') keep('offshore', await offshore(), 50);

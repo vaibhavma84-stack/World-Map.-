@@ -337,3 +337,13 @@ html[data-night="red"] img { filter: invert(1) hue-rotate(180deg); }
 .ais-row { display: grid; grid-template-columns: 1fr 80px 74px; gap: 6px; margin: 6px 0; }
 .ais-row input, .ais-row select { font: inherit; padding: 8px; border: 1px solid var(--line); border-radius: 8px; min-width: 0; }
 .ais-box h3 { margin: 12px 0 4px; }
+.cert { padding: 8px 0; border-bottom: 1px solid var(--line); }
+.cert:last-child { border-bottom: 0; }
+.cert-valid { color: var(--accent); font-weight: 600; font-size: 13px; margin: 2px 0; }
+.cert-by { color: var(--muted); font-size: 13px; margin-bottom: 2px; }
+.learn-list { margin: 0; padding-left: 18px; }
+.learn-list li { margin: 4px 0; }
+.learn-table.cls th { font-family: inherit; }
+.learn-tabs button { min-width: 0; }
+.light-card { display: flex; gap: 12px; align-items: center; }
+#light-show { width: 110px; height: 110px; border-radius: 12px; flex: none; }

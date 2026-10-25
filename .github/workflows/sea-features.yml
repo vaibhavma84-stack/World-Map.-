@@ -29,6 +29,8 @@ jobs:
         with:
           node-version: '22'
       - run: node tools/fetch-sea-features.mjs
+        env:
+          ONLY: ${{ github.event_name == 'push' && 'lights' || '' }}
       - name: Save if changed
         run: |
           git add -A data

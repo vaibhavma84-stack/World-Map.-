@@ -12,6 +12,7 @@ import { setupVoyages } from './voyages.js';
 import { openLearn, ialaRegion } from './learn.js';
 import { openSpace } from './space.js';
 import { setupAis } from './ais.js';
+import { addSeaFeatures, lightCard, playLight, seaFeatureCard, SEA_GROUPS } from './seafeatures.js';
 import { addDayNight, addSeaZones, setupNightMode, setupMeasure, shareView, EXTRA_GROUPS } from './extras.js';
 import { addDiscover, discoverCard, DISCOVER_GROUPS } from './discover.js';
 import {
@@ -318,6 +319,14 @@ map.on('click', (e) => {
   if (mine) { myPlaces.show(mine.properties.id); return; }
   const callHit = shown.voyages && map.getLayer('voyages-calls') && map.queryRenderedFeatures(box, { layers: ['voyages-calls'] })[0];
   if (callHit) { myVoyages.show(); return; }
+  const seaLayers = ['sea-lights', 'sea-offshore', 'sea-seabed', 'sea-telecom', 'sea-pipelines', 'sea-power'].filter((id) => map.getLayer(id) && map.getLayoutProperty(id, 'visibility') !== 'none');
+  const seaHit = seaLayers.length && map.queryRenderedFeatures(box, { layers: seaLayers })[0];
+  if (seaHit) {
+    const g = seaHit.geometry.type === 'Point' ? seaHit.geometry.coordinates : [e.lngLat.lng, e.lngLat.lat];
+    if (seaHit.layer.id === 'sea-lights') { openPanel(lightCard(seaHit.properties, position(g[1], g[0]))); playLight(seaHit.properties); }
+    else openPanel(seaFeatureCard(seaHit.layer.id, seaHit.properties, position(g[1], g[0])));
+    return;
+  }
   const discLayers = Object.values(DISCOVER_GROUPS).flat().filter((id) => map.getLayer(id));
   const discHit = discLayers.length && map.queryRenderedFeatures(box, { layers: discLayers })[0];
   if (discHit) {
@@ -410,8 +419,9 @@ const LAYER_GROUPS = {
   ...DISCOVER_GROUPS,
   ...EXTRA_GROUPS,
   ais: ['ais-ships'],
+  ...SEA_GROUPS,
 };
-const shown = { ais: true, daynight: true, seazones: true, depth: true, myplaces: true, voyages: true, wrecks: true, history: true, marinelife: true, hills: true, ...Object.fromEntries(Object.keys(PLACE_GROUPS).map((g) => [g, true])), cityroads: true, cityrail: true, citybuildings: true, citygreen: true, cityplaces: true, roads: true, eca: true, marpol: true, loadline: true, tss: true, seamarks: true, osmwater: true, terminals: true, currents: true, rivers: true, grid: true, weather: false, ...store.get('layers', {}) };
+const shown = { lights: true, seabed: true, telecom: true, pipelines: true, offshore: true, ais: true, daynight: true, seazones: true, depth: true, myplaces: true, voyages: true, wrecks: true, history: true, marinelife: true, hills: true, ...Object.fromEntries(Object.keys(PLACE_GROUPS).map((g) => [g, true])), cityroads: true, cityrail: true, citybuildings: true, citygreen: true, cityplaces: true, roads: true, eca: true, marpol: true, loadline: true, tss: true, seamarks: true, osmwater: true, terminals: true, currents: true, rivers: true, grid: true, weather: false, ...store.get('layers', {}) };
 let wx = null;
 // Only change what differs: each change makes the map reload that layer's
 // source, and a reload racing a download left the city detail empty.
@@ -904,6 +914,7 @@ map.on('load', () => {
   myVoyages = setupVoyages(map, { openPanel, closePanel, findPorts: (t) => search(t).filter((p) => !p.place), countryName, flag });
   myPlaces = setupMyPlaces(map, { openPanel, closePanel, position });
   addSeaZones(map, 'borders');
+  addSeaFeatures(map, 'borders', PORT_LAYERS[0]).then(applyLayers);
   addDayNight(map, PORT_LAYERS[0]);
   measure = setupMeasure(map, { button: $('#measure-btn'), openPanel, closePanel, position });
   ais = setupAis(map, { status: (t) => { $('#ais-status').textContent = t; }, openPanel, position });
@@ -975,6 +986,8 @@ for (const b of moreBox.querySelectorAll('[data-more]')) {
     if (what === 'space') goToSpace();
     if (what === 'voyages') myVoyages?.show();
     if (what === 'learn') openLearn({ openPanel });
+    if (what === 'class') openLearn({ openPanel, tab: 'class' });
+    if (what === 'certs') openLearn({ openPanel, tab: 'certs' });
     if (what === 'share') shareView(map);
   };
 }
