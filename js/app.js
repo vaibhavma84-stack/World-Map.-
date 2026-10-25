@@ -1259,6 +1259,7 @@ function showPort(p) {
         <div class="note">Enter the ETA in port time.</div>
         <dl id="eta-out"></dl>
       </div>
+      ${atBerthCard(p)}
       ${gasCard(p)}
       <div class="card tide" id="c-tide"><h3>Tide</h3><div class="note">Loading…</div></div>
       <div id="c-facts"></div>
@@ -1290,6 +1291,15 @@ function legFrom(a, b) {
   const y = Math.sin(dl) * Math.cos(f2);
   const x = Math.cos(f1) * Math.sin(f2) - Math.sin(f1) * Math.cos(f2) * Math.cos(dl);
   return { nm, brg: ((Math.atan2(y, x) / r) + 360) % 360 };
+}
+
+// EU ports (and the EEA's and the UK's, which keep the same rule): 0.1%
+// sulphur fuel at berth, inside an ECA or not (EU Directive 2016/802).
+const AT_BERTH = new Set('AT BE BG HR CY CZ DK EE FI FR DE GR HU IE IT LV LT LU MT NL PL PT RO SK SI ES SE NO IS GB GI'.split(' '));
+function atBerthCard(p) {
+  if (!AT_BERTH.has(p.cc)) return '';
+  return `<div class="card"><h3>At berth: 0.1% sulphur</h3>
+    <div class="note">${p.cc === 'GB' || p.cc === 'GI' ? 'UK' : p.cc === 'NO' || p.cc === 'IS' ? 'EEA' : 'EU'} rule (EU Directive 2016/802${p.cc === 'GB' ? ', kept in UK law' : ''}): fuel of 0.1% sulphur or less when at berth for more than two hours, whether or not the port is in an emission control area. Change over as soon as possible after berthing and as late as possible before departure, and log the times.</div></div>`;
 }
 
 function gasNear(p, maxNm = 15) {
