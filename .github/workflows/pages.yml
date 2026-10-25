@@ -40,6 +40,11 @@ jobs:
         with:
           enablement: true
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check the scripts
+        run: for f in js/*.js sw.js; do node --check "$f" || exit 1; done
       - name: Stage the site
         id: stage
         env:
