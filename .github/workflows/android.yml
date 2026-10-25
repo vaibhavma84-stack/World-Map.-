@@ -47,6 +47,8 @@ jobs:
           # The world coastline file, kept on the 'world-coast' release.
           gh release download world-coast -p land.pmtiles -D "$A/data" || echo "No world coastline file yet"
           gh release download rivers -p rivers.pmtiles -D "$A/data" || echo "No rivers file yet"
+          # Satellite imagery, zoom 0 to 7 (Android only: too big for the iPhone site).
+          gh release download satellite -p satellite.pmtiles -D "$A/data" || echo "No satellite file yet"
           du -sh "$A"
 
       - name: Build

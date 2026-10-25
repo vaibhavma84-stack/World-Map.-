@@ -33,9 +33,16 @@ jobs:
           get korea-upa.html "https://www.upa.or.kr/portal/board/post/view.do?bcIdx=676&mid=0601000000&idx=2801"
           get korea-law.html "https://www.law.go.kr/LSW/admRulLsInfoP.do?admRulNm=%ED%99%A9%EC%82%B0%ED%99%94%EB%AC%BC%20%EB%B0%B0%EC%B6%9C%EA%B7%9C%EC%A0%9C%ED%95%B4%EC%97%AD%20%EC%A7%80%EC%A0%95%20%EA%B3%A0%EC%8B%9C"
           get korea-lr.bin "https://info.lr.org/l/12702/2020-05-06/8z5p3n"
+          get korea-kr-2020-etc-06.pdf "http://www.krs.co.kr/TECHNICAL_FILE/2020-ETC-06(E).pdf"
+          get korea-kr-2021-etc-08.pdf "http://www.krs.co.kr/TECHNICAL_FILE/2021-ETC-08(E).pdf"
+          get korea-findaport.html "https://www.findaport.com/country/korea-rep-of"
+          get korea-irclass.html "https://www.irclass.org/technical-circulars/designation-of-sox-emission-control-area-seca-in-republic-of-south-korea/"
+          get korea-cyprus.html "https://maritimecyprus.com/2020/05/08/reminder-new-sox-emission-control-area-in-south-korea-as-of-1st-september-2020/"
+          get korea-egcsa.html "https://www.egcsa.com/republic-of-korea-south-korea/"
           for f in $D/*; do
             case "$(file -b "$f")" in
               PDF*) pdftotext -layout "$f" "$f.txt" ;;
+              *text*|*data*) case "$f" in *.html) python3 -c "import re,sys,html;t=open(sys.argv[1],errors='ignore').read();t=re.sub(r'(?is)<(script|style).*?</\1>','',t);t=re.sub(r'<[^>]+>',' ',t);print(re.sub(r'[ \t]+',' ',html.unescape(t)))" "$f" > "$f.txt" ;; esac ;;
               *HTML*|*XML*) python3 -c "import re,sys,html;t=open(sys.argv[1],errors='ignore').read();t=re.sub(r'(?is)<(script|style).*?</\1>','',t);t=re.sub(r'<[^>]+>',' ',t);print(re.sub(r'[ \t]+',' ',html.unescape(t)))" "$f" > "$f.txt" ;;
             esac
           done

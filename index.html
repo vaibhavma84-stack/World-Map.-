@@ -84,6 +84,8 @@
     <p class="layers-head">Places to go <small>Mumbai · tap for details and photos</small></p>
     <div id="poi-switches"></div>
     <p class="layers-head">Map</p>
+    <label><input type="checkbox" data-layer="satellite"> 🛰️ Satellite view <small>whole world offline on Android; closer in online, kept once seen</small></label>
+    <label><input type="checkbox" data-layer="ais"> 🚢 Ships from the ship's AIS <small>Android, on the bridge network · set up in Settings</small></label>
     <label><input type="checkbox" data-layer="daynight"> Day and night <small>the night side and twilight, moving live</small></label>
     <label><input type="checkbox" data-layer="seazones"> Time zones at sea and the date line</label>
     <label><input type="checkbox" data-layer="depth"> Ocean depths and seafloor <small>lighter is shallower · depths offline, seafloor shading online or saved</small></label>
@@ -173,6 +175,17 @@
       <div id="saved-areas" hidden>
         <p class="hint" id="saved-areas-text"></p>
         <button id="clear-areas" type="button" class="secondary">Delete saved areas</button>
+      </div>
+      <div class="ais-box" id="ais-box" hidden>
+        <h3>Ship's AIS</h3>
+        <p class="hint">Shows the ships your AIS receives, with no internet: join the bridge Wi-Fi of the AIS unit, pilot plug or multiplexer and give its address. TCP is usual (port 10110 or as set on the unit); for UDP leave the address empty.</p>
+        <div class="ais-row">
+          <input id="ais-host" type="text" inputmode="decimal" placeholder="Address, e.g. 192.168.1.1" autocomplete="off">
+          <input id="ais-port" type="number" placeholder="Port" value="10110">
+          <select id="ais-proto"><option value="tcp">TCP</option><option value="udp">UDP</option></select>
+        </div>
+        <button id="ais-btn" type="button" class="secondary wide">Connect</button>
+        <p class="hint" id="ais-status">Off</p>
       </div>
       <div class="update-box">
         <button id="update-btn" type="button" class="primary wide">Check for updates</button>

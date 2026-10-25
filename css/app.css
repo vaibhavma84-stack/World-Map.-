@@ -334,3 +334,6 @@ html[data-night="red"] body { filter: invert(0.95) hue-rotate(180deg) brightness
 html[data-night="red"] img { filter: invert(1) hue-rotate(180deg); }
 #measure-btn.active { background: #d53f8c; color: #fff; }
 #measure-btn.active svg { stroke: #fff; }
+.ais-row { display: grid; grid-template-columns: 1fr 80px 74px; gap: 6px; margin: 6px 0; }
+.ais-row input, .ais-row select { font: inherit; padding: 8px; border: 1px solid var(--line); border-radius: 8px; min-width: 0; }
+.ais-box h3 { margin: 12px 0 4px; }

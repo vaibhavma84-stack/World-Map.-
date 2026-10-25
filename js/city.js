@@ -209,6 +209,8 @@ const DEM = {
 };
 export function ensureDem(map) {
   if (!map.getSource('dem')) map.addSource('dem', DEM);
+  // For 3D: the same terrain with the seafloor at sea level (js/app.js).
+  if (!map.getSource('dem3d')) map.addSource('dem3d', { ...DEM, tiles: ['demflat://{z}/{x}/{y}'] });
 }
 function peakImage() {
   const s = 2, w = 14 * s, h = 12 * s;
@@ -249,11 +251,12 @@ export function setup3D(map, button, onChange) {
     button.classList.toggle('active', on);
     if (on) {
       ensureDem(map);
-      if (navigator.onLine !== false) map.setTerrain({ source: 'dem', exaggeration: 1.5 });
+      map.setTerrain({ source: 'dem3d', exaggeration: 1.5 }); // offline from the saved terrain
       map.dragRotate.enable();
       map.touchZoomRotate.enableRotation();
       map.touchPitch.enable();
-      map.easeTo({ pitch: 60, bearing: map.getBearing() || -15, zoom: Math.max(map.getZoom(), 14.5), duration: 1200 });
+      // Anywhere: mountains rise from the terrain, buildings where the map has them.
+      map.easeTo({ pitch: 60, bearing: map.getBearing() || -15, zoom: Math.max(map.getZoom(), 3), duration: 1200 });
     } else {
       map.setTerrain(null);
       map.dragRotate.disable();

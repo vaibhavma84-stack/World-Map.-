@@ -6,6 +6,14 @@ import android.app.DownloadManager;
 import android.content.ContentValues;
 import android.provider.MediaStore;
 import java.io.OutputStream;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.InetSocketAddress;
+import java.net.Socket;
+import java.nio.charset.StandardCharsets;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import android.database.Cursor;
 import android.os.Build;
 import android.os.Environment;
@@ -171,6 +179,17 @@ public class MainActivity extends Activity {
      * signal drops, works on mobile data) and opens Android's installer.
      */
     private long downloadId = -1;
+    private final ConcurrentLinkedQueue<String> aisLines = new ConcurrentLinkedQueue<>();
+    private volatile int aisGeneration = 0;
+    private volatile String aisState = "Off";
+    private volatile java.io.Closeable aisSocket;
+
+    private void offer(String line) {
+        if (line.startsWith("!") || line.startsWith("$")) {
+            aisLines.offer(line);
+            while (aisLines.size() > 20000) aisLines.poll();
+        }
+    }
 
     private class Updater {
         @JavascriptInterface
@@ -235,6 +254,70 @@ public class MainActivity extends Activity {
                 return "failed";
             }
         }
+
+        // ---- The ship's AIS: NMEA sentences from the bridge network (TCP or UDP).
+        @JavascriptInterface
+        public void aisConnect(String host, int port, boolean udp) {
+            aisDisconnect();
+            final int generation = ++aisGeneration;
+            aisState = "Connecting to " + (udp ? "UDP port " + port : host + ":" + port) + "…";
+            Thread t = new Thread(() -> {
+                while (generation == aisGeneration) {
+                    try {
+                        if (udp) {
+                            try (DatagramSocket ds = new DatagramSocket(port)) {
+                                aisSocket = ds;
+                                ds.setSoTimeout(5000);
+                                aisState = "Listening on UDP port " + port;
+                                byte[] buf = new byte[4096];
+                                while (generation == aisGeneration) {
+                                    DatagramPacket pk = new DatagramPacket(buf, buf.length);
+                                    try { ds.receive(pk); } catch (java.net.SocketTimeoutException e) { continue; }
+                                    for (String line : new String(pk.getData(), 0, pk.getLength(), StandardCharsets.US_ASCII).split("[\\r\\n]+")) offer(line);
+                                }
+                            }
+                        } else {
+                            try (Socket sock = new Socket()) {
+                                aisSocket = sock;
+                                sock.connect(new InetSocketAddress(host, port), 8000);
+                                sock.setSoTimeout(60000);
+                                aisState = "Connected to " + host + ":" + port;
+                                BufferedReader in = new BufferedReader(new InputStreamReader(sock.getInputStream(), StandardCharsets.US_ASCII));
+                                String line;
+                                while (generation == aisGeneration && (line = in.readLine()) != null) offer(line);
+                            }
+                        }
+                    } catch (Exception e) {
+                        if (generation != aisGeneration) break;
+                        aisState = "No connection (" + e.getClass().getSimpleName() + "); trying again";
+                        try { Thread.sleep(5000); } catch (InterruptedException ie) { break; }
+                    }
+                }
+            });
+            t.setDaemon(true);
+            t.start();
+        }
+
+        @JavascriptInterface
+        public void aisDisconnect() {
+            aisGeneration++;
+            try { if (aisSocket != null) aisSocket.close(); } catch (Exception e) { /* closed */ }
+            aisSocket = null;
+            aisState = "Off";
+            aisLines.clear();
+        }
+
+        /** The sentences received since the last call, one per line. */
+        @JavascriptInterface
+        public String aisRead() {
+            StringBuilder b = new StringBuilder();
+            String line;
+            while ((line = aisLines.poll()) != null) b.append(line).append('\n');
+            return b.toString();
+        }
+
+        @JavascriptInterface
+        public String aisState() { return aisState; }
 
         /** Opens the installer; first asks to allow installs from this app if needed. */
         @JavascriptInterface

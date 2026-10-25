@@ -11,6 +11,7 @@ import { openSky } from './sky.js';
 import { setupVoyages } from './voyages.js';
 import { openLearn, ialaRegion } from './learn.js';
 import { openSpace } from './space.js';
+import { setupAis } from './ais.js';
 import { addDayNight, addSeaZones, setupNightMode, setupMeasure, shareView, EXTRA_GROUPS } from './extras.js';
 import { addDiscover, discoverCard, DISCOVER_GROUPS } from './discover.js';
 import {
@@ -300,6 +301,7 @@ map.getCanvas().addEventListener('mouseleave', () => { $('#coords').textContent 
 // Tap a port, or near one: fingers are wider than dots.
 let myPlaces = null;
 let measure = null;
+let ais = null;
 let myVoyages = null;
 let discoverPlaces = [];
 let cityPlaces = [];
@@ -310,6 +312,8 @@ map.on('click', (e) => {
   const pad = 12;
   const box = [[e.point.x - pad, e.point.y - pad], [e.point.x + pad, e.point.y + pad]];
   if (map.getLayer('voyage-ship') && map.queryRenderedFeatures(box, { layers: ['voyage-ship', 'voyage-ahead'] })[0]) { voyage.open(); return; }
+  const ship = shown.ais && ais?.hit(box);
+  if (ship) { ais.show(ship.properties.mmsi); return; }
   const mine = myPlaces?.hit(box);
   if (mine) { myPlaces.show(mine.properties.id); return; }
   const callHit = shown.voyages && map.getLayer('voyages-calls') && map.queryRenderedFeatures(box, { layers: ['voyages-calls'] })[0];
@@ -405,8 +409,9 @@ const LAYER_GROUPS = {
   voyages: ['voyages-legs', 'voyages-calls'],
   ...DISCOVER_GROUPS,
   ...EXTRA_GROUPS,
+  ais: ['ais-ships'],
 };
-const shown = { daynight: true, seazones: true, depth: true, myplaces: true, voyages: true, wrecks: true, history: true, marinelife: true, hills: true, ...Object.fromEntries(Object.keys(PLACE_GROUPS).map((g) => [g, true])), cityroads: true, cityrail: true, citybuildings: true, citygreen: true, cityplaces: true, roads: true, eca: true, marpol: true, loadline: true, tss: true, seamarks: true, osmwater: true, terminals: true, currents: true, rivers: true, grid: true, weather: false, ...store.get('layers', {}) };
+const shown = { ais: true, daynight: true, seazones: true, depth: true, myplaces: true, voyages: true, wrecks: true, history: true, marinelife: true, hills: true, ...Object.fromEntries(Object.keys(PLACE_GROUPS).map((g) => [g, true])), cityroads: true, cityrail: true, citybuildings: true, citygreen: true, cityplaces: true, roads: true, eca: true, marpol: true, loadline: true, tss: true, seamarks: true, osmwater: true, terminals: true, currents: true, rivers: true, grid: true, weather: false, ...store.get('layers', {}) };
 let wx = null;
 // Only change what differs: each change makes the map reload that layer's
 // source, and a reload racing a download left the city detail empty.
@@ -603,20 +608,41 @@ async function demFetch(z, x, y, signal) {
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.arrayBuffer();
 }
-maplibregl.addProtocol('dem', async (params, abort) => {
-  const [z, x, y] = params.url.slice('dem://'.length).split('/').map(Number);
+async function demTile(z, x, y, signal) {
   const key = demKey(z, x, y);
   if (hasCaches) {
     for (const name of [OFM_SAVED, OFM_SEEN]) {
-      try { const hit = await (await caches.open(name)).match(key); if (hit) return { data: await hit.arrayBuffer() }; } catch { /* go on */ }
+      try { const hit = await (await caches.open(name)).match(key); if (hit) return hit.arrayBuffer(); } catch { /* go on */ }
     }
   }
-  const data = await demFetch(z, x, y, abort.signal);
+  const data = await demFetch(z, x, y, signal);
   if (hasCaches) {
     const copy = data.slice(0);
     caches.open(OFM_SEEN).then((c) => c.put(key, new Response(copy))).catch(() => {});
   }
+  return data;
+}
+maplibregl.addProtocol('dem', async (params, abort) => {
+  const [z, x, y] = params.url.slice('dem://'.length).split('/').map(Number);
+  return { data: await demTile(z, x, y, abort.signal) };
+});
+  }
   return { data };
+});
+// The same terrain for the 3D view, with the seafloor raised to sea level so
+// the sea stays flat while mountains rise (terrarium: height = R*256 + G +
+// B/256 - 32768 metres; sea level is 128, 0, 0).
+maplibregl.addProtocol('demflat', async (params, abort) => {
+  const [z, x, y] = params.url.slice('demflat://'.length).split('/').map(Number);
+  const bmp = await createImageBitmap(new Blob([await demTile(z, x, y, abort.signal)]));
+  const c = new OffscreenCanvas(bmp.width, bmp.height);
+  const g = c.getContext('2d', { willReadFrequently: true });
+  g.drawImage(bmp, 0, 0);
+  const img = g.getImageData(0, 0, bmp.width, bmp.height);
+  const d = img.data;
+  for (let i = 0; i < d.length; i += 4) if (d[i] < 128) { d[i] = 128; d[i + 1] = 0; d[i + 2] = 0; }
+  g.putImageData(img, 0, 0);
+  return { data: await (await c.convertToBlob({ type: 'image/png' })).arrayBuffer() };
 });
 // Keep the everyday store to its most recent 30,000 tiles.
 if (hasCaches) setTimeout(async () => {
@@ -807,6 +833,48 @@ async function addDepths() {
   applyLayers();
 }
 
+// The satellite view: Sentinel-2 cloudless (EOX). The Android app carries
+// the whole world to zoom 7 (data/satellite.pmtiles); closer in, and on the
+// iPhone, the pieces come online and are kept once seen (and in saved areas).
+const SAT_URL = 'https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2021_3857/default/g/{z}/{y}/{x}.jpg';
+const SAT_FILE = new URL('data/satellite.pmtiles', location.href).href;
+const satKey = (z, x, y) => `https://sat.cache/${z}/${x}/${y}.jpg`;
+maplibregl.addProtocol('sat', async (params, abort) => {
+  const [z, x, y] = params.url.slice('sat://'.length).split('/').map(Number);
+  const key = satKey(z, x, y);
+  if (hasCaches) {
+    for (const name of [OFM_SAVED, OFM_SEEN]) {
+      try { const hit = await (await caches.open(name)).match(key); if (hit) return { data: await hit.arrayBuffer() }; } catch { /* go on */ }
+    }
+  }
+  const res = await fetch(SAT_URL.replace('{z}', z).replace('{x}', x).replace('{y}', y), { signal: abort.signal, cache: 'no-store' });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.arrayBuffer();
+  if (hasCaches) {
+    const copy = data.slice(0);
+    caches.open(OFM_SEEN).then((c) => c.put(key, new Response(copy))).catch(() => {});
+  }
+  return { data };
+});
+async function addSatellite() {
+  let offline = false;
+  try {
+    const r = await fetch(SAT_FILE, { headers: { Range: 'bytes=0-126' } });
+    r.body?.cancel();
+    offline = r.status === 206 && usePmtiles();
+  } catch { /* not in this build */ }
+  const attribution = 'Sentinel-2 cloudless by EOX (Copernicus data)';
+  const paint = { 'raster-fade-duration': 150 };
+  if (offline) {
+    map.addSource('sat-low', { type: 'raster', url: `pmtiles://${SAT_FILE}`, tileSize: 256, attribution });
+    map.addLayer({ id: 'sat-low', type: 'raster', source: 'sat-low', maxzoom: 8, layout: { visibility: 'none' }, paint }, 'rivers-0');
+  }
+  map.addSource('sat-high', { type: 'raster', tiles: ['sat://{z}/{x}/{y}'], tileSize: 256, maxzoom: 15, attribution });
+  map.addLayer({ id: 'sat-high', type: 'raster', source: 'sat-high', minzoom: offline ? 8 : 0, layout: { visibility: 'none' }, paint }, 'rivers-0');
+  LAYER_GROUPS.satellite = offline ? ['sat-low', 'sat-high'] : ['sat-high'];
+  applyLayers();
+}
+
 async function addWorldCoast() {
   if (!(await worldReady) || !usePmtiles()) return;
   map.addSource('world', { type: 'vector', url: `pmtiles://${WORLD_LAND}`, maxzoom: 11 });
@@ -820,6 +888,7 @@ async function addWorldCoast() {
 
 map.on('load', () => {
   addWorldCoast().then(addDepths);
+  addSatellite();
   addOsmWater().then(applyLayers);
   addTerminals();
   addTss();
@@ -837,6 +906,24 @@ map.on('load', () => {
   addSeaZones(map, 'borders');
   addDayNight(map, PORT_LAYERS[0]);
   measure = setupMeasure(map, { button: $('#measure-btn'), openPanel, closePanel, position });
+  ais = setupAis(map, { status: (t) => { $('#ais-status').textContent = t; }, openPanel, position });
+  if (ais.available) {
+    $('#ais-box').hidden = false;
+    const saved = store.get('ais', null);
+    if (saved) { $('#ais-host').value = saved.host; $('#ais-port').value = saved.port; $('#ais-proto').value = saved.proto; }
+    const connect = () => {
+      const host = $('#ais-host').value.trim(), port = Number($('#ais-port').value) || 10110, proto = $('#ais-proto').value;
+      if (proto === 'tcp' && !host) { $('#ais-status').textContent = 'Give the address of the AIS unit (or choose UDP).'; return; }
+      ais.connect(host, port, proto === 'udp');
+      store.set('ais', { host, port, proto, on: true });
+      $('#ais-btn').textContent = 'Disconnect';
+    };
+    $('#ais-btn').onclick = () => {
+      if ($('#ais-btn').textContent === 'Disconnect') { ais.disconnect(); store.set('ais', { ...store.get('ais', {}), on: false }); $('#ais-btn').textContent = 'Connect'; }
+      else connect();
+    };
+    if (saved?.on) connect();
+  }
   myVoyages.onPlacesLoaded(() => myPlaces.refresh());
   addDiscover(map, 'voyages-legs').then((f) => { discoverPlaces = f || []; applyLayers(); });
   $('#add-place').onclick = () => { layersBox.hidden = true; myPlaces.addAtCentre(); };
